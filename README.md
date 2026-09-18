@@ -45,7 +45,7 @@ Requisitos del proyecto:
 
 - JDK 17
 - Android SDK
-- compileSdk 37
+- compileSdk 36 / targetSdk 36
 - Gradle 9.6
 - Android Gradle Plugin 9.4.0
 
