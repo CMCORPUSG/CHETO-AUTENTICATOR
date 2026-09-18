@@ -1,0 +1,29 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing / credentials
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+client_secret*.json
+oauth*.json
+*.pem
+*.p12
+
+# CHETO Authenticator sensitive/runtime data
+*.enc
+*.backup
+*.backup.json
+*.totp
+secrets/
+backups/
+exports/
