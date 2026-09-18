@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.cmcorpusg.chetoauthenticator"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.cmcorpusg.chetoauthenticator"
@@ -51,11 +51,12 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.18.0")
-    implementation("androidx.activity:activity-compose:1.13.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")\n    implementation("androidx.fragment:fragment-ktx:1.8.0")
+    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.activity:activity-compose:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.9")
 
-    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
+    val composeBom = platform("androidx.compose:compose-bom:2025.08.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
     implementation("androidx.compose.ui:ui")
@@ -63,7 +64,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    implementation("androidx.work:work-runtime-ktx:2.11.2")
+    implementation("androidx.work:work-runtime-ktx:2.10.5")
     implementation("androidx.biometric:biometric:1.1.0")
 
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
