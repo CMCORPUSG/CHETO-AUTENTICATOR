@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Schedule
@@ -31,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
+import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
 import com.cmcorpusg.chetoauthenticator.data.MobileVault
 
 @Composable
@@ -41,12 +43,16 @@ internal fun SecurityCenterScreen(
 ) {
     val context = LocalContext.current
     val backup = BackupSettings(context)
+    val recoveryKeyConfigured = RecoveryKeyStore(context).hasConfiguredKey()
+    val recentBackup = backup.lastBackupEpochMillis > 0L &&
+        System.currentTimeMillis() - backup.lastBackupEpochMillis < 48L * 60L * 60L * 1000L
     val protectedCount = listOf(
         vault.biometric && biometricReady,
         !vault.screenshots,
         vault.lockTimeoutSeconds <= 60,
         vault.hideCodes,
-        backup.driveEnabled
+        backup.driveEnabled,
+        recoveryKeyConfigured
     ).count { it }
 
     Column(
@@ -66,7 +72,7 @@ internal fun SecurityCenterScreen(
                     Column {
                         Text("Centro de seguridad", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            "$protectedCount de 5 protecciones recomendadas activas",
+                            "$protectedCount de 6 protecciones recomendadas activas",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -112,8 +118,24 @@ internal fun SecurityCenterScreen(
         SecurityStatus(
             Icons.Rounded.Backup,
             "Recuperación",
-            if (backup.driveEnabled) "Backup automático de Drive configurado" else "Usa copia local .cheto o conecta Drive",
+            when {
+                backup.driveEnabled && recentBackup -> "Drive activo · última copia reciente"
+                backup.driveEnabled -> "Drive activo · conviene sincronizar"
+                else -> "Usa copia local .cheto o conecta Drive"
+            },
             backup.driveEnabled
+        )
+        SecurityStatus(
+            Icons.Rounded.Lock,
+            "Clave de recuperación",
+            if (recoveryKeyConfigured) "Protegida por Android Keystore en este dispositivo" else "Se configura al habilitar backup automático",
+            recoveryKeyConfigured
+        )
+        SecurityStatus(
+            Icons.Rounded.AccountCircle,
+            "Identidades vinculadas",
+            if (vault.linkedIdentities.isEmpty()) "Opcional · ninguna vinculada" else "${vault.linkedIdentities.size} proveedor(es) vinculados",
+            vault.linkedIdentities.isNotEmpty()
         )
 
         Button(onClick = onLockNow, modifier = Modifier.fillMaxWidth()) {
