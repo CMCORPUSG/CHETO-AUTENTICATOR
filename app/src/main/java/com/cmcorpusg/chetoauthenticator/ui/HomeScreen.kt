@@ -21,14 +21,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DriveFileMove
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -41,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,6 +75,9 @@ internal fun HomeScreen(
     onEdit: (MobileAccount) -> Unit,
     onDelete: (MobileAccount) -> Unit,
     onToggleFavorite: (MobileAccount) -> Unit,
+    onBulkDelete: (Set<String>) -> Unit,
+    onBulkCategory: (Set<String>, String) -> Unit,
+    onBulkFavorite: (Set<String>, Boolean) -> Unit,
     onCategories: () -> Unit
 ) {
     val context = LocalContext.current
@@ -78,6 +88,9 @@ internal fun HomeScreen(
     var favoritesOnly by remember { mutableStateOf(false) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis() / 1000) }
     var revealed by remember { mutableStateOf<String?>(null) }
+    var manageAccounts by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showMoveCategory by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis() / 1000; delay(1000) } }
     LaunchedEffect(revealed) { if (revealed != null) { delay(10_000); revealed = null } }
 
@@ -151,6 +164,14 @@ internal fun HomeScreen(
         }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(
+                    onClick = {
+                        manageAccounts = !manageAccounts
+                        selectedIds = emptySet()
+                    },
+                    label = { Text(if (manageAccounts) "Salir de selección" else "Gestionar") },
+                    leadingIcon = { Icon(if (manageAccounts) Icons.Rounded.Close else Icons.Rounded.SelectAll, null, Modifier.size(17.dp)) }
+                )
                 FilterChip(
                     selected = favoritesOnly,
                     onClick = { favoritesOnly = !favoritesOnly },
@@ -178,6 +199,74 @@ internal fun HomeScreen(
                 }
             }
         }
+        if (manageAccounts) {
+            item {
+                PremiumCard(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "${selectedIds.size} seleccionada(s)",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    "Gestiona varias cuentas sin abrirlas una por una.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            TextButton(
+                                onClick = {
+                                    selectedIds = if (selectedIds.size == accounts.size) {
+                                        emptySet()
+                                    } else {
+                                        accounts.map { it.id }.toSet()
+                                    }
+                                }
+                            ) {
+                                Text(if (selectedIds.size == accounts.size && accounts.isNotEmpty()) "Ninguna" else "Todas")
+                            }
+                        }
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            AssistChip(
+                                enabled = selectedIds.isNotEmpty(),
+                                onClick = {
+                                    onBulkFavorite(selectedIds, true)
+                                    selectedIds = emptySet()
+                                },
+                                label = { Text("Favoritas") },
+                                leadingIcon = { Icon(Icons.Rounded.Star, null, Modifier.size(17.dp)) }
+                            )
+                            AssistChip(
+                                enabled = selectedIds.isNotEmpty(),
+                                onClick = { showMoveCategory = true },
+                                label = { Text("Mover") },
+                                leadingIcon = { Icon(Icons.Rounded.DriveFileMove, null, Modifier.size(17.dp)) }
+                            )
+                            AssistChip(
+                                enabled = selectedIds.isNotEmpty(),
+                                onClick = {
+                                    onBulkDelete(selectedIds)
+                                    selectedIds = emptySet()
+                                    manageAccounts = false
+                                },
+                                label = { Text("Eliminar") },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, null, Modifier.size(17.dp)) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
         if (accounts.isEmpty()) {
             item {
                 PremiumCard(Modifier.fillMaxWidth()) {
@@ -200,6 +289,15 @@ internal fun HomeScreen(
                 seconds = TotpEngine.secondsRemaining(now, account.period),
                 accent = categoryColor(account.category, vault.categoryColors),
                 hidden = vault.hideCodes && revealed != account.id,
+                selected = selectedIds.contains(account.id),
+                selectionMode = manageAccounts,
+                onSelect = {
+                    selectedIds = if (selectedIds.contains(account.id)) {
+                        selectedIds - account.id
+                    } else {
+                        selectedIds + account.id
+                    }
+                },
                 onCodeClick = { if (vault.hideCodes) revealed = account.id else onCopy(code) },
                 onCopy = { onCopy(code) },
                 onFavorite = { onToggleFavorite(account) },
@@ -207,6 +305,33 @@ internal fun HomeScreen(
                 onDelete = { onDelete(account) }
             )
         }
+    }
+
+    if (showMoveCategory) {
+        AlertDialog(
+            onDismissRequest = { showMoveCategory = false },
+            title = { Text("Mover cuentas") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    vault.categories.forEach { target ->
+                        TextButton(
+                            onClick = {
+                                onBulkCategory(selectedIds, target)
+                                selectedIds = emptySet()
+                                showMoveCategory = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(target, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showMoveCategory = false }) { Text("Cancelar") }
+            }
+        )
     }
 }
 
@@ -217,13 +342,18 @@ private fun TotpCard(
     seconds: Int,
     accent: Color,
     hidden: Boolean,
+    selected: Boolean,
+    selectionMode: Boolean,
+    onSelect: () -> Unit,
     onCodeClick: () -> Unit,
     onCopy: () -> Unit,
     onFavorite: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    PremiumCard(Modifier.fillMaxWidth()) {
+    PremiumCard(
+        Modifier.fillMaxWidth().clickable(enabled = selectionMode, onClick = onSelect)
+    ) {
         Column(Modifier.padding(start = 15.dp, top = 14.dp, end = 10.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 Avatar(account.issuer, account.photo, 44)
@@ -231,13 +361,22 @@ private fun TotpCard(
                     Text(account.issuer, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                     Text(account.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-                IconButton(onClick = onFavorite, modifier = Modifier.size(37.dp)) {
+                if (selectionMode) {
                     Icon(
-                        if (account.favorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                        if (account.favorite) "Quitar de favoritas" else "Marcar favorita",
-                        Modifier.size(20.dp),
-                        tint = if (account.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                        if (selected) "Seleccionada" else "No seleccionada",
+                        Modifier.size(24.dp),
+                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                } else {
+                    IconButton(onClick = onFavorite, modifier = Modifier.size(37.dp)) {
+                        Icon(
+                            if (account.favorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                            if (account.favorite) "Quitar de favoritas" else "Marcar favorita",
+                            Modifier.size(20.dp),
+                            tint = if (account.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 Surface(shape = RoundedCornerShape(50), color = accent.copy(alpha = .12f)) {
                     Text(account.category, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = accent, maxLines = 1)
@@ -256,10 +395,12 @@ private fun TotpCard(
                     Text("$seconds", style = MaterialTheme.typography.labelSmall)
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                IconButton(onClick = onCopy, modifier = Modifier.size(39.dp)) { Icon(Icons.Rounded.ContentCopy, "Copiar", Modifier.size(19.dp)) }
-                IconButton(onClick = onEdit, modifier = Modifier.size(39.dp)) { Icon(Icons.Rounded.Edit, "Editar", Modifier.size(19.dp)) }
-                IconButton(onClick = onDelete, modifier = Modifier.size(39.dp)) { Icon(Icons.Rounded.Delete, "Eliminar", Modifier.size(19.dp), tint = MaterialTheme.colorScheme.error) }
+            if (!selectionMode) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    IconButton(onClick = onCopy, modifier = Modifier.size(39.dp)) { Icon(Icons.Rounded.ContentCopy, "Copiar", Modifier.size(19.dp)) }
+                    IconButton(onClick = onEdit, modifier = Modifier.size(39.dp)) { Icon(Icons.Rounded.Edit, "Editar", Modifier.size(19.dp)) }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(39.dp)) { Icon(Icons.Rounded.Delete, "Eliminar", Modifier.size(19.dp), tint = MaterialTheme.colorScheme.error) }
+                }
             }
         }
     }
