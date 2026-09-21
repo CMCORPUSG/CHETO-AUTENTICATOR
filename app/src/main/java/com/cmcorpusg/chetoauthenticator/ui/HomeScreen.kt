@@ -50,10 +50,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.data.MobileAccount
 import com.cmcorpusg.chetoauthenticator.data.MobileVault
@@ -68,6 +70,8 @@ internal fun HomeScreen(
     onToggleFavorite: (MobileAccount) -> Unit,
     onCategories: () -> Unit
 ) {
+    val context = LocalContext.current
+    val backupSettings = remember { BackupSettings(context) }
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Todos") }
     var sortMode by remember { mutableStateOf("Favoritos") }
@@ -102,10 +106,20 @@ internal fun HomeScreen(
                     IconTile(Icons.Rounded.Shield, null, background = Color.White.copy(alpha = .58f))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Bóveda protegida", style = MaterialTheme.typography.titleMedium)
-                        Text("${vault.accounts.size} cuentas · ${vault.accounts.count { it.favorite }} favoritas · códigos offline", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "${vault.accounts.size} cuentas · ${vault.accounts.count { it.favorite }} favoritas · " +
+                                if (backupSettings.driveEnabled) "backup activo" else "backup manual",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     Surface(shape = RoundedCornerShape(50), color = ChetoSuccess.copy(alpha = .13f)) {
-                        Text("Activa", Modifier.padding(horizontal = 9.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = ChetoSuccess)
+                        Text(
+                            if (backupSettings.driveEnabled) "Protegida" else "Local",
+                            Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ChetoSuccess
+                        )
                     }
                 }
             }
