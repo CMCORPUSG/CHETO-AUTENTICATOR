@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.lifecycleScope
+import com.cmcorpusg.chetoauthenticator.backup.BackupContentFingerprint
 import com.cmcorpusg.chetoauthenticator.backup.DriveBackupClient
 import com.cmcorpusg.chetoauthenticator.backup.DriveBackupInfo
 import com.cmcorpusg.chetoauthenticator.backup.OneDriveBackupClient
