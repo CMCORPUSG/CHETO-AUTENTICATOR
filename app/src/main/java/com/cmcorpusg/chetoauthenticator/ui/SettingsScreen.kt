@@ -18,15 +18,22 @@ import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Screenshot
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -43,6 +50,15 @@ internal fun SettingsPage(
     onPin: () -> Unit,
     onBiometricSetup: () -> Unit
 ) {
+    var showAutoLock by remember { mutableStateOf(false) }
+    val autoLockLabel = when (vault.lockTimeoutSeconds) {
+        0 -> "Inmediatamente"
+        30 -> "Después de 30 segundos"
+        60 -> "Después de 1 minuto"
+        300 -> "Después de 5 minutos"
+        else -> "Inmediatamente"
+    }
+
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -75,6 +91,12 @@ internal fun SettingsPage(
                 )
             }
             GroupDivider()
+            ActionRow(
+                Icons.Rounded.Schedule,
+                "Bloqueo automático",
+                autoLockLabel
+            ) { showAutoLock = true }
+            GroupDivider()
             ToggleRow(Icons.Rounded.VisibilityOff, "Ocultar códigos", "Revelar cada TOTP al tocar", vault.hideCodes) { onUpdate(vault.copy(hideCodes = it)) }
             GroupDivider()
             ToggleRow(Icons.Rounded.Screenshot, "Permitir capturas", "Desactiva la protección de pantalla", vault.screenshots) { onUpdate(vault.copy(screenshots = it)) }
@@ -88,10 +110,41 @@ internal fun SettingsPage(
             ActionRow(Icons.Rounded.Category, "Categorías", "Organiza cuentas y colores", onCategories)
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("CHETO Authenticator 0.8.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("CHETO Authenticator 0.9.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Android nativo · Kotlin + Compose", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
+    }
+
+    if (showAutoLock) {
+        AlertDialog(
+            onDismissRequest = { showAutoLock = false },
+            title = { Text("Bloqueo automático") },
+            text = {
+                Column {
+                    listOf(
+                        0 to "Inmediatamente",
+                        30 to "30 segundos",
+                        60 to "1 minuto",
+                        300 to "5 minutos"
+                    ).forEach { (seconds, label) ->
+                        TextButton(
+                            onClick = {
+                                onUpdate(vault.copy(lockTimeoutSeconds = seconds))
+                                showAutoLock = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(label, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showAutoLock = false }) { Text("Cancelar") }
+            }
+        )
     }
 }
 
