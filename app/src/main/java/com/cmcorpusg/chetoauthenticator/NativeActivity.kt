@@ -612,7 +612,33 @@ class NativeActivity : FragmentActivity() {
                 store.write(merged)
                 withContext(Dispatchers.Main){if(vault!=null)vault=merged}
             } }
-            else->work(if(mode=="export")"Elige dónde guardar la copia" else "Copia preparada") {
+            else -> if(mode.startsWith("exportSelected:")){
+                work("Elige dónde guardar la selección") {
+                    val ids=mode.substringAfter("exportSelected:")
+                        .split(',')
+                        .filter { it.isNotBlank() }
+                        .toSet()
+                    val selected=current.accounts.filter { it.id in ids }
+                    require(selected.isNotEmpty()){"Sin cuentas seleccionadas"}
+                    val usedCategories=(listOf("Sin categoría")+selected.map { it.category }).distinct()
+                    val subset=current.copy(
+                        name="",
+                        emails=emptyList(),
+                        photo="",
+                        categories=usedCategories,
+                        accounts=selected,
+                        categoryColors=current.categoryColors.filterKeys { it in usedCategories },
+                        linkedIdentities=emptyList(),
+                        trash=emptyList()
+                    )
+                    val payload=NativeVault.export(subset,password)
+                    withContext(Dispatchers.Main){
+                        pendingExport=payload
+                        external=true
+                        saveFile.launch("CHETO-SELECCION-${System.currentTimeMillis()}.cheto")
+                    }
+                }
+            } else work(if(mode=="export")"Elige dónde guardar la copia" else "Copia preparada") {
                 val payload=NativeVault.export(current,password)
                 withContext(Dispatchers.Main){
                     if(mode=="export"){
