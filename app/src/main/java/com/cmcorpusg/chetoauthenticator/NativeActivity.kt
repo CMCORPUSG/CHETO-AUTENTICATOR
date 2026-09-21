@@ -205,8 +205,22 @@ class NativeActivity : FragmentActivity() {
             else->work(if(mode=="export")"Elige dónde guardar la copia" else "Copia preparada") {
                 val payload=NativeVault.export(current,password)
                 withContext(Dispatchers.Main){
-                    if(mode=="export"){pendingExport=payload;external=true;saveFile.launch("CHETO-${System.currentTimeMillis()}.cheto")}
-                    else drive { token -> work("Copia cifrada guardada en Google Drive") { DriveBackupClient("cheto_native_backup_").upload(token,payload) } }
+                    if(mode=="export"){
+                        pendingExport=payload
+                        external=true
+                        saveFile.launch("CHETO-${System.currentTimeMillis()}.cheto")
+                    } else drive { token ->
+                        work("Copia cifrada guardada en Google Drive") {
+                            DriveBackupClient("cheto_native_backup_").upload(token,payload)
+                            RecoveryKeyStore(this@NativeActivity).configure(password.toCharArray())
+                            BackupSettings(this@NativeActivity).apply {
+                                driveEnabled=true
+                                lastBackupEpochMillis=System.currentTimeMillis()
+                                lastError=null
+                            }
+                            BackupScheduler.schedule(this@NativeActivity)
+                        }
+                    }
                 }
             }
         }
