@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
@@ -78,6 +79,7 @@ internal fun HomeScreen(
     onBulkDelete: (Set<String>) -> Unit,
     onBulkCategory: (Set<String>, String) -> Unit,
     onBulkFavorite: (Set<String>, Boolean) -> Unit,
+    onBulkExport: (Set<String>) -> Unit,
     onCategories: () -> Unit
 ) {
     val context = LocalContext.current
@@ -260,6 +262,16 @@ internal fun HomeScreen(
                                 onClick = { showMoveCategory = true },
                                 label = { Text("Mover") },
                                 leadingIcon = { Icon(Icons.Rounded.DriveFileMove, null, Modifier.size(17.dp)) }
+                            )
+                            AssistChip(
+                                enabled = selectedIds.isNotEmpty(),
+                                onClick = {
+                                    onBulkExport(selectedIds)
+                                    selectedIds = emptySet()
+                                    manageAccounts = false
+                                },
+                                label = { Text("Exportar") },
+                                leadingIcon = { Icon(Icons.Rounded.Backup, null, Modifier.size(17.dp)) }
                             )
                             AssistChip(
                                 enabled = selectedIds.isNotEmpty(),
