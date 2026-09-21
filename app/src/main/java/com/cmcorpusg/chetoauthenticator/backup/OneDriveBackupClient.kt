@@ -17,7 +17,7 @@ class OneDriveBackupClient(
 ) {
     fun upload(accessToken: String, content: String): OneDriveBackupInfo {
         ensureAppFolder(accessToken)
-        val name = "$prefix${System.currentTimeMillis()}.cheto"
+        val name = FIXED_BACKUP_NAME
         val connection = open(
             "https://graph.microsoft.com/v1.0/me/drive/special/approot:/$name:/content",
             accessToken,
@@ -33,7 +33,7 @@ class OneDriveBackupClient(
             name = json.optString("name", name),
             modifiedTime = json.optString("lastModifiedDateTime")
         )
-        prune(accessToken)
+        removeLegacyDuplicates(accessToken)
         return result
     }
 
@@ -81,9 +81,11 @@ class OneDriveBackupClient(
         connection.disconnect()
     }
 
-    private fun prune(accessToken: String) {
+    private fun removeLegacyDuplicates(accessToken: String) {
         val files = listBackups(accessToken, MAX_BACKUPS + 20)
-        files.drop(MAX_BACKUPS).forEach { delete(accessToken, it.id) }
+        files.filter { it.name != FIXED_BACKUP_NAME }.forEach {
+            delete(accessToken, it.id)
+        }
     }
 
     private fun listBackups(accessToken: String, pageSize: Int): List<OneDriveBackupInfo> {
@@ -142,5 +144,6 @@ class OneDriveBackupClient(
 
     companion object {
         private const val MAX_BACKUPS = 7
+        private const val FIXED_BACKUP_NAME = "CHETO-BACKUP.cheto"
     }
 }
