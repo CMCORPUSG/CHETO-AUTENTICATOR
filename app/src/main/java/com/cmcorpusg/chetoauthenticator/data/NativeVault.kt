@@ -27,7 +27,8 @@ data class MobileVault(
     val pin: String = "", val name: String = "", val emails: List<String> = emptyList(), val photo: String = "",
     val categories: List<String> = listOf("Sin categoría", "Trabajo", "Social", "Personal"),
     val accounts: List<MobileAccount> = emptyList(), val dark: Boolean = false,
-    val hideCodes: Boolean = false, val biometric: Boolean = true, val screenshots: Boolean = false
+    val hideCodes: Boolean = false, val biometric: Boolean = true, val screenshots: Boolean = false,
+    val categoryColors: Map<String, String> = emptyMap()
 )
 
 class NativeVault(context: Context) {
@@ -132,6 +133,12 @@ class NativeVault(context: Context) {
                 }
             )
             .put(
+                "categoryColors",
+                JSONObject().apply {
+                    s.categoryColors.forEach { (name, color) -> put(name, color) }
+                }
+            )
+            .put(
                 "settings",
                 JSONObject()
                     .put("dark", s.dark)
@@ -173,6 +180,13 @@ class NativeVault(context: Context) {
                 ).distinct()
 
             val emails = p.optJSONArray("emails") ?: JSONArray()
+            val colorsObject = root.optJSONObject("categoryColors") ?: JSONObject()
+            val categoryColors = buildMap<String, String> {
+                colorsObject.keys().forEach { key ->
+                    val value = colorsObject.optString(key)
+                    if (value.matches(Regex("#[0-9A-Fa-f]{6}"))) put(key, value.uppercase())
+                }
+            }
             val accounts = (0 until arr.length()).map { i ->
                 val a = arr.getJSONObject(i)
                 MobileAccount(
@@ -209,7 +223,8 @@ class NativeVault(context: Context) {
                 settings.optBoolean("dark"),
                 settings.optBoolean("hide"),
                 settings.optBoolean("biometric", true),
-                settings.optBoolean("screenshots")
+                settings.optBoolean("screenshots"),
+                categoryColors
             )
         }
 
