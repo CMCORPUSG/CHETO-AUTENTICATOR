@@ -64,7 +64,8 @@ class NativeVaultBackupInstrumentedTest {
             screenshots = false,
             lockTimeoutSeconds = 60,
             clipboardClearSeconds = 15,
-            reauthOnReveal = true
+            reauthOnReveal = true,
+            trashRetentionDays = 90
         )
 
         val encrypted = NativeVault.export(source, password)
@@ -88,6 +89,13 @@ class NativeVaultBackupInstrumentedTest {
         assertEquals(localDevice.lockTimeoutSeconds, restored.lockTimeoutSeconds)
         assertEquals(localDevice.clipboardClearSeconds, restored.clipboardClearSeconds)
         assertEquals(localDevice.reauthOnReveal, restored.reauthOnReveal)
+        assertEquals(localDevice.trashRetentionDays, restored.trashRetentionDays)
+
+        val inspection = NativeVault.inspectBackup(encrypted, password)
+        assertEquals(source.accounts.size, inspection.accountCount)
+        assertEquals(source.categories.size, inspection.categoryCount)
+        assertEquals(source.linkedIdentities.size, inspection.linkedIdentityCount)
+        assertEquals(source.trash.size, inspection.trashedAccountCount)
     }
 
     @Test
