@@ -49,6 +49,15 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
+      - name: Secret guard
+        shell: bash
+        run: |
+          set -e
+          if grep -RniE 'GOCSPX-|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|client_secret[[:space:]]*[:=]' app/src/main app/build.gradle.kts 2>/dev/null; then
+            echo "Potential embedded secret detected."
+            exit 1
+          fi
+
       - name: Unit tests
         run: gradle :app:testDebugUnitTest --stacktrace
 
