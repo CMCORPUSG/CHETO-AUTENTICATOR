@@ -18,6 +18,9 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.cmcorpusg.chetoauthenticator.backup.DriveBackupClient
+import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
+import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
+import com.cmcorpusg.chetoauthenticator.backup.BackupScheduler
 import com.cmcorpusg.chetoauthenticator.core.OtpAuthParser
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.data.*
@@ -139,6 +142,9 @@ class NativeActivity : FragmentActivity() {
         }.onSuccess { persisted->
             vault=persisted
             applySettings(persisted)
+            if(BackupSettings(this).driveEnabled){
+                BackupScheduler.runNow(this)
+            }
         }.onFailure { message("No se pudieron guardar los cambios") }
     }
     private fun work(success: String,action: suspend ()->Unit){
