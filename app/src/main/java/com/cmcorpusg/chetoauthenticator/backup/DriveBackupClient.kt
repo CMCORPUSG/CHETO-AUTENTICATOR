@@ -66,6 +66,20 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
     fun listRecentBackups(accessToken: String, limit: Int = MAX_BACKUPS): List<DriveBackupInfo> =
         listBackups(accessToken, limit.coerceIn(1, MAX_BACKUPS))
 
+    fun delete(accessToken: String, fileId: String) {
+        require(fileId.matches(Regex("[A-Za-z0-9_-]{5,}"))) { "Identificador de Drive inválido" }
+        val connection = open(
+            "https://www.googleapis.com/drive/v3/files/$fileId",
+            accessToken,
+            "DELETE"
+        )
+        val code = connection.responseCode
+        connection.disconnect()
+        if (code !in 200..299 && code != 404) {
+            throw IllegalStateException("No se pudo eliminar la copia de Drive (HTTP $code)")
+        }
+    }
+
     private fun trimOldBackups(accessToken: String) {
         val files = listBackups(accessToken, 100)
         files.drop(MAX_BACKUPS).forEach { backup ->
