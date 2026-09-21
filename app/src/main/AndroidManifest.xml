@@ -7,6 +7,7 @@
         android:name=".ChetoAuthenticatorApp"
         android:allowBackup="false"
         android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="CHETO Authenticator"
         android:icon="@drawable/ic_cheto"
         android:enableOnBackInvokedCallback="true"
