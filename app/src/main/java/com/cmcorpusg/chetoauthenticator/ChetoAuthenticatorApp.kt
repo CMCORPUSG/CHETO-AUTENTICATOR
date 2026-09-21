@@ -1,14 +1,14 @@
 package com.cmcorpusg.chetoauthenticator
 
 import android.app.Application
-import com.cmcorpusg.chetoauthenticator.backup.BackupScheduler
-import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 
 class ChetoAuthenticatorApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        if (BackupSettings(this).driveEnabled) {
-            BackupScheduler.schedule(this)
-        }
+
+        // V3 uses NativeVault as its source of truth. The V1 periodic worker
+        // still reads SecureAccountStore, so scheduling it here could upload a
+        // stale legacy snapshot. Automatic V3 backups will be re-enabled only
+        // after the worker is migrated to NativeVault.
     }
 }
