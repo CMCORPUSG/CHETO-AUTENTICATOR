@@ -549,7 +549,7 @@ fun NativeApp(
                     }
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
                         Icon(Icons.Rounded.Lock,contentDescription=null,modifier=Modifier.size(14.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Cifrado local · funciona sin internet",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("TOTP local · nube, logos y perfiles usan internet cuando hace falta",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
