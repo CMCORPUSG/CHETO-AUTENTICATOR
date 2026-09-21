@@ -194,6 +194,21 @@ fun NativeApp(
                                     )
                                 }
                             },
+                            onRestoreAll={
+                                val restored=vault.accounts.toMutableList()
+                                val remaining=mutableListOf<TrashedAccount>()
+                                var recovered=0
+                                vault.trash.forEach { trashed->
+                                    if(AccountPolicy.findDuplicate(trashed.account,restored)==null){
+                                        restored+=trashed.account
+                                        recovered++
+                                    }else{
+                                        remaining+=trashed
+                                    }
+                                }
+                                onUpdate(vault.copy(accounts=restored,trash=remaining))
+                                onMessage("$recovered cuenta(s) restaurada(s) · ${remaining.size} duplicada(s) permanecen en papelera")
+                            },
                             onDeleteForever={ trashed->
                                 critical=PendingCriticalAction(
                                     "Borrar definitivamente",
@@ -214,6 +229,18 @@ fun NativeApp(
                                     ){
                                         onUpdate(vault.copy(trash=emptyList()))
                                     }
+                                }
+                            },
+                            onRetentionChange={ days->
+                                val currentDays=vault.trashRetentionDays
+                                val moreDestructive=days>0 && (currentDays==0 || days<currentDays)
+                                if(moreDestructive){
+                                    critical=PendingCriticalAction(
+                                        "Reducir retención de papelera",
+                                        "Las cuentas antiguas podrán borrarse automáticamente antes. Confirma tu identidad para aplicar este cambio."
+                                    ){onUpdate(vault.copy(trashRetentionDays=days))}
+                                }else{
+                                    onUpdate(vault.copy(trashRetentionDays=days))
                                 }
                             }
                         )
