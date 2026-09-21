@@ -23,6 +23,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.lifecycleScope
 import com.cmcorpusg.chetoauthenticator.backup.DriveBackupClient
 import com.cmcorpusg.chetoauthenticator.backup.DriveBackupInfo
+import com.cmcorpusg.chetoauthenticator.backup.OneDriveBackupClient
 import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 import com.cmcorpusg.chetoauthenticator.backup.BackupScheduler
@@ -336,7 +337,7 @@ class NativeActivity : FragmentActivity() {
     private fun linkGoogleIdentity(){
         val current=vault ?: return
         if(BuildConfig.GOOGLE_WEB_CLIENT_ID.isBlank()){
-            message("Configura CHETO_GOOGLE_WEB_CLIENT_ID para activar Google Sign-In")
+            message("Google todavía no está configurado en esta compilación. Falta el OAuth Web Client ID de CHETO.")
             return
         }
         external=true
@@ -383,7 +384,7 @@ class NativeActivity : FragmentActivity() {
     private fun linkMicrosoftIdentity(){
         val current=vault ?: return
         if(BuildConfig.MICROSOFT_CLIENT_ID.isBlank()){
-            message("Configura CHETO_MICROSOFT_CLIENT_ID y el archivo MSAL para activar Microsoft")
+            message("Microsoft todavía no está configurado en esta compilación. Falta registrar CHETO en Microsoft Entra.")
             return
         }
         external=true
@@ -669,7 +670,9 @@ class NativeActivity : FragmentActivity() {
         )
     }
     private fun drive(action:(String)->Unit){
-        val request=AuthorizationRequest.builder().setRequestedScopes(listOf(Scope("https://www.googleapis.com/auth/drive.appdata"))).build()
+        val request=AuthorizationRequest.builder().setRequestedScopes(listOf(Scope("https://www.googleapis.com/auth/drive.appdata")))
+            .setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT)
+            .build()
         Identity.getAuthorizationClient(this).authorize(request).addOnSuccessListener { result ->
             if(result.hasResolution()){
                 val intent=result.pendingIntent
@@ -677,6 +680,27 @@ class NativeActivity : FragmentActivity() {
             }else result.accessToken?.let(action) ?: message("Google no devolvió acceso")
         }.addOnFailureListener { pendingExport=null;pendingPassword="";message("Configura OAuth Android y el SHA-1 de este APK para conectar Drive. Puedes usar el respaldo local.") }
     }
+    private fun oneDrive(action:(String)->Unit){
+        if(BuildConfig.MICROSOFT_CLIENT_ID.isBlank()){
+            message("Microsoft OneDrive aún no está configurado para esta compilación. Falta registrar la app en Microsoft Entra.")
+            return
+        }
+        external=true
+        lifecycleScope.launch {
+            try{
+                val token=MicrosoftIdentityClient(this@NativeActivity).acquireOneDriveToken()
+                external=false
+                action(token)
+            }catch(_: MicrosoftSignInCancelledException){
+                external=false
+                message("Conexión con Microsoft cancelada")
+            }catch(e:Exception){
+                external=false
+                message(e.message ?: "No se pudo conectar Microsoft OneDrive")
+            }
+        }
+    }
+
     private fun loadDriveBackups(){
         drive { token ->
             work("Historial de Drive actualizado") {
@@ -746,6 +770,29 @@ class NativeActivity : FragmentActivity() {
 
 
         when(mode){
+            "onedrive"->oneDrive { token -> work("Copia cifrada guardada en Microsoft OneDrive") {
+                val payload=NativeVault.export(current,password)
+                OneDriveBackupClient("cheto_native_backup_").upload(token,payload)
+                BackupSettings(this@NativeActivity).apply {
+                    oneDriveEnabled=true
+                    lastOneDriveBackupEpochMillis=System.currentTimeMillis()
+                    lastError=null
+                }
+            } }
+            "onedriveRestore"->oneDrive { token -> work("Copia de OneDrive restaurada") {
+                val data=OneDriveBackupClient("cheto_native_backup_").downloadLatest(token)?:error("Sin copias en OneDrive")
+                val restored=NativeVault.restore(data,password,current)
+                store.write(restored)
+                withContext(Dispatchers.Main){if(vault!=null)vault=restored}
+            } }
+            "onedriveVerify"->oneDrive { token -> work("Copia de OneDrive verificada") {
+                val data=OneDriveBackupClient("cheto_native_backup_").downloadLatest(token)?:error("Sin copias en OneDrive")
+                val inspection=NativeVault.inspectBackup(data,password)
+                BackupSettings(this@NativeActivity).lastVerifiedBackupEpochMillis=System.currentTimeMillis()
+                withContext(Dispatchers.Main){
+                    message("OneDrive válido · ${inspection.accountCount} cuentas · ${inspection.categoryCount} categorías")
+                }
+            } }
             "restore"->{pendingRestoreMode="replace";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
             "restoreMerge"->{pendingRestoreMode="merge";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
             "verify"->{pendingRestoreMode="verify";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
