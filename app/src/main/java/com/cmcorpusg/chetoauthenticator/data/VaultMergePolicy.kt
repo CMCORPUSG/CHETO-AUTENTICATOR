@@ -18,6 +18,9 @@ object VaultMergePolicy {
         val mergedIdentities = (current.linkedIdentities + restored.linkedIdentities)
             .distinctBy { it.provider + ":" + it.subject }
 
+        val mergedVerifiedEmails = (current.verifiedEmails + restored.verifiedEmails)
+            .distinctBy { it.lowercase() }
+
         val mergedTrash = current.trash.toMutableList()
         restored.trash.forEach { trashed ->
             val activeDuplicate = AccountPolicy.findDuplicate(trashed.account, mergedAccounts) != null
@@ -32,8 +35,10 @@ object VaultMergePolicy {
 
         return current.copy(
             name = current.name.ifBlank { restored.name },
+            username = current.username.ifBlank { restored.username },
             photo = current.photo.ifBlank { restored.photo },
             emails = mergedEmails,
+            verifiedEmails = mergedVerifiedEmails,
             categories = (current.categories + restored.categories).distinct(),
             accounts = mergedAccounts,
             categoryColors = restored.categoryColors + current.categoryColors,
