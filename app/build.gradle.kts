@@ -64,8 +64,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    implementation("io.coil-kt.coil3:coil-compose:3.6.3")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     implementation("androidx.work:work-runtime-ktx:2.10.5")
     implementation("androidx.biometric:biometric:1.1.0")
