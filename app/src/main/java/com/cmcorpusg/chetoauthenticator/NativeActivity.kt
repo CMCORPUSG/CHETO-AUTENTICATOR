@@ -278,9 +278,8 @@ class NativeActivity : FragmentActivity() {
         }.onSuccess { persisted->
             vault=persisted
             applySettings(persisted)
-            if(BackupSettings(this).driveEnabled){
-                BackupScheduler.runNow(this)
-            }
+            // Automatic cloud backup runs every 24 hours. Manual "Guardar ahora"
+            // remains available from the Backup screen.
         }.onFailure { message("No se pudieron guardar los cambios") }
     }
     private fun recoverVault(newPin:String,password:String){
@@ -688,9 +687,13 @@ class NativeActivity : FragmentActivity() {
         external=true
         lifecycleScope.launch {
             try{
-                val token=MicrosoftIdentityClient(this@NativeActivity).acquireOneDriveToken()
+                val session=MicrosoftIdentityClient(this@NativeActivity).acquireOneDriveSession()
+                BackupSettings(this@NativeActivity).apply {
+                    oneDriveAccountId=session.accountId
+                    oneDriveAccountEmail=session.email
+                }
                 external=false
-                action(token)
+                action(session.accessToken)
             }catch(_: MicrosoftSignInCancelledException){
                 external=false
                 message("Conexión con Microsoft cancelada")
@@ -773,11 +776,13 @@ class NativeActivity : FragmentActivity() {
             "onedrive"->oneDrive { token -> work("Copia cifrada guardada en Microsoft OneDrive") {
                 val payload=NativeVault.export(current,password)
                 OneDriveBackupClient("cheto_native_backup_").upload(token,payload)
+                RecoveryKeyStore(this@NativeActivity,"onedrive").configure(password.toCharArray())
                 BackupSettings(this@NativeActivity).apply {
                     oneDriveEnabled=true
                     lastOneDriveBackupEpochMillis=System.currentTimeMillis()
                     lastError=null
                 }
+                BackupScheduler.schedule(this@NativeActivity)
             } }
             "onedriveRestore"->oneDrive { token -> work("Copia de OneDrive restaurada") {
                 val data=OneDriveBackupClient("cheto_native_backup_").downloadLatest(token)?:error("Sin copias en OneDrive")
