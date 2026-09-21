@@ -289,6 +289,12 @@ fun NativeApp(
                                         }
                                     }
                                 },
+                                onRevealProtected={ reveal->
+                                    critical=PendingCriticalAction(
+                                        "Revelar código TOTP",
+                                        "Confirma tu identidad para mostrar temporalmente este código."
+                                    ){reveal()}
+                                },
                                 onCategories={manageCategories=true}
                             )
                             "Backup"->BackupPage(
