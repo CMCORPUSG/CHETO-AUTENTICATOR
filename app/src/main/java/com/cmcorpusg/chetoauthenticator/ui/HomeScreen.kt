@@ -1,5 +1,7 @@
 package com.cmcorpusg.chetoauthenticator.ui
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccessTime
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -84,6 +87,9 @@ internal fun HomeScreen(
 ) {
     val context = LocalContext.current
     val backupSettings = remember { BackupSettings(context) }
+    val automaticTime = runCatching {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.AUTO_TIME, 0) == 1
+    }.getOrDefault(true)
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Todos") }
     var sortMode by remember { mutableStateOf("Favoritos") }
@@ -135,6 +141,40 @@ internal fun HomeScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = ChetoSuccess
                         )
+                    }
+                }
+            }
+        }
+        if (!automaticTime) {
+            item {
+                Card(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            context.startActivity(Intent(Settings.ACTION_DATE_SETTINGS))
+                        },
+                    shape = CardShape,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Row(
+                        Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        IconTile(
+                            Icons.Rounded.AccessTime,
+                            null,
+                            tint = MaterialTheme.colorScheme.error,
+                            background = MaterialTheme.colorScheme.surface
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text("Revisa la hora del teléfono", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Activa fecha y hora automáticas para evitar códigos TOTP fuera de sincronía.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
                     }
                 }
             }
