@@ -220,7 +220,12 @@ fun NativeApp(
                             "Inicio"->HomeScreen(
                                 vault=vault,
                                 onCopy=onCopy,
-                                onEdit={editor=it},
+                                onEdit={ account->
+                                    critical=PendingCriticalAction(
+                                        "Editar cuenta",
+                                        "Confirma tu identidad antes de modificar el secreto TOTP o la configuración de esta cuenta."
+                                    ){editor=account}
+                                },
                                 onDelete={ account->
                                     critical=PendingCriticalAction(
                                         "Eliminar cuenta",
