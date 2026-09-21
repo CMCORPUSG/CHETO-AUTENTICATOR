@@ -67,7 +67,8 @@ import com.cmcorpusg.chetoauthenticator.data.AccountPolicy
 import com.cmcorpusg.chetoauthenticator.data.MobileAccount
 import com.cmcorpusg.chetoauthenticator.data.MobileVault
 import com.cmcorpusg.chetoauthenticator.data.TrashedAccount
-import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
 import kotlinx.coroutines.delay
 
 private val Blue=ChetoBlue
@@ -1386,12 +1387,27 @@ internal fun categoryColor(name:String,overrides:Map<String,String>):Color =
                 modifier=Modifier.fillMaxSize(),
                 contentScale=ContentScale.Crop
             )
-            remote!=null -> AsyncImage(
+            remote!=null -> SubcomposeAsyncImage(
                 model=remote,
                 contentDescription="$name logo",
-                modifier=Modifier.fillMaxSize().background(Color.White).padding(6.dp),
+                modifier=Modifier.fillMaxSize(),
                 contentScale=ContentScale.Fit
-            )
+            ){
+                when(val state=painter.state){
+                    is AsyncImagePainter.State.Success -> Box(
+                        Modifier.fillMaxSize().background(Color.White).padding(6.dp),
+                        contentAlignment=Alignment.Center
+                    ){
+                        Image(
+                            painter=state.painter,
+                            contentDescription="$name logo",
+                            modifier=Modifier.fillMaxSize(),
+                            contentScale=ContentScale.Fit
+                        )
+                    }
+                    else -> Unit
+                }
+            }
         }
     }
 }
