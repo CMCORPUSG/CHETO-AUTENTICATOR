@@ -715,7 +715,7 @@ class NativeActivity : FragmentActivity() {
 
     private fun disableBackup(){
         BackupSettings(this).driveEnabled=false
-        BackupScheduler.disable(this)
+        BackupScheduler.disableGoogle(this)
         message("Backup automático desactivado")
     }
 
