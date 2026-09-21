@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cmcorpusg.chetoauthenticator.backup.BackupScheduler
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.data.MobileAccount
@@ -183,14 +184,42 @@ fun NativeApp(
 }
 
 @Composable private fun AccountEditor(initial:MobileAccount,categories:List<String>,onPhoto:()->Unit,onDismiss:()->Unit,onSave:(MobileAccount)->Unit,onMessage:(String)->Unit){
-    var a by remember(initial.id) { mutableStateOf(initial) };var period by remember(initial.id){mutableStateOf(initial.period.toString())}
+    var a by remember(initial.id) { mutableStateOf(initial) }
+    var period by remember(initial.id){mutableStateOf(initial.period.toString())}
+    var logoDomain by remember(initial.id){ mutableStateOf(ServiceCatalog.domainFor(initial.issuer).orEmpty()) }
     LaunchedEffect(initial.photo){a=a.copy(photo=initial.photo)}
     androidx.compose.ui.window.Dialog(onDismissRequest=onDismiss,properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)){
         Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background){
             Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
                 Text("Cuenta TOTP",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                Row(verticalAlignment=Alignment.CenterVertically){Avatar(a.issuer,a.photo);TextButton(onClick=onPhoto){Text("Elegir logo local")}}
-                Field("Servicio",a.issuer,{a=a.copy(issuer=it)});Field("Cuenta o correo",a.label,{a=a.copy(label=it)})
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                    Avatar(a.issuer,a.photo)
+                    Column(Modifier.weight(1f)){
+                        Text(a.issuer.ifBlank{"Servicio"},fontWeight=FontWeight.Bold)
+                        Text(
+                            if(a.photo.isBlank())"Logo automático al guardar" else "Logo configurado",
+                            style=MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+                Field("Servicio",a.issuer,{value->
+                    a=a.copy(issuer=value)
+                    if(logoDomain.isBlank())logoDomain=ServiceCatalog.domainFor(value).orEmpty()
+                })
+                Field("Dominio para logo (opcional)",logoDomain,{logoDomain=it.trim()})
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedButton(
+                        onClick={
+                            val source=logoDomain.ifBlank{a.issuer}
+                            val url=ServiceCatalog.logoUrlFor(source)
+                            if(url==null)onMessage("Escribe un servicio o dominio válido")
+                            else {a=a.copy(photo=url);onMessage("Logo online seleccionado")}
+                        },
+                        modifier=Modifier.weight(1f)
+                    ){Text("Buscar logo")}
+                    OutlinedButton(onClick=onPhoto,modifier=Modifier.weight(1f)){Text("Logo local")}
+                }
+                Field("Cuenta o correo",a.label,{a=a.copy(label=it)})
                 Field("Clave secreta Base32",a.secret,{a=a.copy(secret=it)},password=true)
                 Choice("Categoría",a.category,categories){a=a.copy(category=it)}
                 Field("Notas",a.notes,{a=a.copy(notes=it)},singleLine=false)
@@ -236,15 +265,17 @@ fun NativeApp(
 
 @Composable private fun BackupScreen(busy:Boolean,action:(String)->Unit){
     val context=LocalContext.current
-    val settings=BackupSettings(context)
+    val settings=remember { BackupSettings(context) }
+    var autoEnabled by remember { mutableStateOf(settings.driveEnabled) }
+    LaunchedEffect(busy){ autoEnabled=settings.driveEnabled }
     val last=if(settings.lastBackupEpochMillis>0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Aún no realizado"
     Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
         Panel("Copia de seguridad","Tus cuentas, categorías y perfil viajan cifrados con una contraseña de recuperación.")
         Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
             Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-                Text(if(settings.driveEnabled)"Backup automático activo" else "Backup automático no configurado",fontWeight=FontWeight.Bold)
+                Text(if(autoEnabled)"Backup automático activo" else "Backup automático no configurado",fontWeight=FontWeight.Bold)
                 Text("Última copia: $last",style=MaterialTheme.typography.bodySmall)
-                Text(if(settings.driveEnabled)"Programado aproximadamente cada 24 horas y después de cambios." else "Conecta Google Drive una vez para activar la programación.",style=MaterialTheme.typography.bodySmall)
+                Text(if(autoEnabled)"Programado aproximadamente cada 24 horas y después de cambios." else "Conecta Google Drive una vez para activar la programación.",style=MaterialTheme.typography.bodySmall)
                 settings.lastError?.takeIf { it.isNotBlank() }?.let { Text("Aviso: $it",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error) }
             }
         }
@@ -252,8 +283,17 @@ fun NativeApp(
         OutlinedButton(onClick={action("restore")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("Restaurar desde archivo")}
         HorizontalDivider();Text("Google Drive",style=MaterialTheme.typography.titleLarge)
         Text("La copia se cifra antes de subirla a la carpeta privada appDataFolder de CHETO.",style=MaterialTheme.typography.bodyMedium)
-        OutlinedButton(onClick={action("drive")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text(if(settings.driveEnabled)"Sincronizar y actualizar contraseña" else "Conectar Google Drive")}
+        OutlinedButton(onClick={action("drive")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text(if(autoEnabled)"Sincronizar y actualizar contraseña" else "Conectar Google Drive")}
         OutlinedButton(onClick={action("driveRestore")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("Restaurar desde Google Drive")}
+        if(autoEnabled)OutlinedButton(
+            onClick={
+                settings.driveEnabled=false
+                BackupScheduler.disable(context)
+                autoEnabled=false
+            },
+            enabled=!busy,
+            modifier=Modifier.fillMaxWidth()
+        ){Text("Desactivar backup automático")}
         Text("Conserva tu contraseña fuera del teléfono. Sin ella no se puede descifrar el respaldo.",style=MaterialTheme.typography.bodySmall)
     }
 }
