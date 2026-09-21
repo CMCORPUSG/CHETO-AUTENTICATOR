@@ -19,6 +19,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.lifecycleScope
 import com.cmcorpusg.chetoauthenticator.backup.DriveBackupClient
 import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
@@ -28,6 +29,7 @@ import com.cmcorpusg.chetoauthenticator.core.GoogleAuthMigrationParser
 import com.cmcorpusg.chetoauthenticator.core.OtpAuthParser
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.data.*
+import com.cmcorpusg.chetoauthenticator.identity.GoogleIdentityClient
 import com.cmcorpusg.chetoauthenticator.ui.NativeApp
 import com.cmcorpusg.chetoauthenticator.ui.ServiceCatalog
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
@@ -148,6 +150,11 @@ class NativeActivity : FragmentActivity() {
                     }.onSuccess { persisted->vault=persisted;exists=true }
                         .onFailure { message("No se pudo guardar el perfil") }
                 },onBiometric=::biometric,onBiometricSetup=::requestBiometricSetup,onVerifyPin=::verifyPin,onVerifyBiometric=::reauthenticateBiometric,onChangePin=::changePin,onUpdate=::update,
+                googleIdentityConfigured=BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank(),
+                microsoftIdentityConfigured=BuildConfig.MICROSOFT_CLIENT_ID.isNotBlank(),
+                onLinkGoogle=::linkGoogleIdentity,
+                onLinkMicrosoft={ message(if(BuildConfig.MICROSOFT_CLIENT_ID.isBlank()) "Configura CHETO_MICROSOFT_CLIENT_ID para activar Microsoft" else "Microsoft Sign-In está preparado para la siguiente conexión MSAL") },
+                onUnlinkIdentity=::unlinkIdentity,
                 onScan={ photo -> external=true;if(photo)pickQr.launch("image/*") else GmsBarcodeScanning.getClient(this).startScan()
                     .addOnSuccessListener { it.rawValue?.let(::receiveQr) }.addOnFailureListener { message("Escáner no disponible. Usa una imagen o la clave manual.") }
                     .addOnCompleteListener { external=false } },
@@ -247,6 +254,65 @@ class NativeActivity : FragmentActivity() {
                 .setNegativeButtonText("Usar PIN")
                 .build()
         )
+    }
+
+    private fun linkGoogleIdentity(){
+        val current=vault ?: return
+        if(BuildConfig.GOOGLE_WEB_CLIENT_ID.isBlank()){
+            message("Configura CHETO_GOOGLE_WEB_CLIENT_ID para activar Google Sign-In")
+            return
+        }
+        external=true
+        lifecycleScope.launch {
+            try{
+                val result=GoogleIdentityClient(
+                    this@NativeActivity,
+                    BuildConfig.GOOGLE_WEB_CLIENT_ID
+                ).signIn()
+                val identity=LinkedIdentity(
+                    provider=result.provider,
+                    subject=result.subject,
+                    email=result.email,
+                    displayName=result.displayName,
+                    photo=result.photo
+                )
+                val latest=vault ?: current
+                val identities=latest.linkedIdentities
+                    .filterNot { it.provider==identity.provider && it.subject==identity.subject } + identity
+                val emails=if(latest.emails.any { it.equals(identity.email,true) }){
+                    latest.emails
+                }else{
+                    latest.emails + identity.email
+                }
+                update(
+                    latest.copy(
+                        linkedIdentities=identities,
+                        emails=emails,
+                        name=latest.name.ifBlank { identity.displayName },
+                        photo=latest.photo.ifBlank { identity.photo }
+                    )
+                )
+                message("Cuenta de Google vinculada")
+            }catch(_: GetCredentialCancellationException){
+                message("Inicio de sesión con Google cancelado")
+            }catch(e:Exception){
+                message(e.message ?: "No se pudo vincular la cuenta de Google")
+            }finally{
+                external=false
+            }
+        }
+    }
+
+    private fun unlinkIdentity(provider:String,subject:String){
+        val current=vault ?: return
+        val target=current.linkedIdentities.firstOrNull {
+            it.provider==provider && it.subject==subject
+        } ?: return
+        val remaining=current.linkedIdentities.filterNot {
+            it.provider==provider && it.subject==subject
+        }
+        update(current.copy(linkedIdentities=remaining))
+        message("${if(provider=="google") "Google" else "Microsoft"} desvinculado de CHETO")
     }
 
     private fun changePin(currentPin:String,newPin:String){
