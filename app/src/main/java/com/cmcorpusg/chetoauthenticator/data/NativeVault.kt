@@ -115,7 +115,12 @@ class NativeVault(context: Context) {
                     .putInt("lockCycle", cycle)
                     .putLong("lockedUntil", now + duration)
                     .commit()
-                error("Demasiados intentos. CHETO se bloqueó por ${duration / 60_000L} min")
+                val lockLabel = if (duration < 60_000L) {
+                    "${duration / 1000L} s"
+                } else {
+                    "${duration / 60_000L} min"
+                }
+                error("Demasiados intentos. CHETO se bloqueó por $lockLabel")
             } else {
                 prefs.edit().putInt("attempts", attempts).commit()
                 error("PIN incorrecto. Quedan ${MAX_PIN_ATTEMPTS - attempts} intentos")
