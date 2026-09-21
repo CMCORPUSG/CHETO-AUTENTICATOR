@@ -134,26 +134,169 @@ fun NativeApp(
     }
 }
 
-@Composable private fun LoginScreen(exists:Boolean,onLogin:(String)->Unit,onRegister:(String,String,String)->Unit,onBio:()->Unit,onMessage:(String)->Unit){
-    var name by remember { mutableStateOf("") };var email by remember { mutableStateOf("") };var pin by remember { mutableStateOf("") };var confirm by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Blue,Purple))).safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){
-        Text("◈",color=Color.White,fontSize=64.sp);Text("CHETO",color=Color.White,fontSize=36.sp,fontWeight=FontWeight.Black)
-        Text("Authenticator · acceso local seguro",color=Color.White.copy(alpha=.8f));Spacer(Modifier.height(28.dp))
-        Card(shape=RoundedCornerShape(26.dp)) { Column(Modifier.padding(22.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-            Text(if(exists)"Bienvenido de nuevo" else "Crear perfil local",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-            if(!exists){Field("Nombre",name,{name=it});Field("Correo principal",email,{email=it},keyboard=KeyboardType.Email)}
-            Field("PIN de 6 dígitos",pin,{pin=it.filter(Char::isDigit).take(6)},password=true,keyboard=KeyboardType.NumberPassword)
-            if(!exists)Field("Repite tu PIN",confirm,{confirm=it.filter(Char::isDigit).take(6)},password=true,keyboard=KeyboardType.NumberPassword)
-            Button(onClick={
-                if(pin.length!=6)onMessage("El PIN debe tener 6 dígitos")
-                else if(exists){onLogin(pin);pin=""}
-                else if(name.isBlank()||!android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches())onMessage("Completa tu nombre y un correo válido")
-                else if(pin!=confirm)onMessage("Los PIN no coinciden")
-                else onRegister(name.trim(),email.trim(),pin)
-            },modifier=Modifier.fillMaxWidth()){Text(if(exists)"Desbloquear" else "Crear perfil")}
-            if(exists)OutlinedButton(onClick=onBio,modifier=Modifier.fillMaxWidth()){Text("Entrar con huella")}
-            Text("Tus códigos se generan sin internet.",style=MaterialTheme.typography.bodySmall)
-        } }
+@Composable private fun LoginScreen(
+    exists:Boolean,
+    onLogin:(String)->Unit,
+    onRegister:(String,String,String)->Unit,
+    onBio:()->Unit,
+    onMessage:(String)->Unit
+){
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var pin by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+
+    Column(
+        Modifier.fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Color(0xFF152A70),Blue,Purple)))
+            .safeDrawingPadding()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal=24.dp,vertical=30.dp),
+        horizontalAlignment=Alignment.CenterHorizontally,
+        verticalArrangement=Arrangement.Center
+    ){
+        Surface(
+            modifier=Modifier.size(82.dp),
+            shape=RoundedCornerShape(24.dp),
+            color=Color.White.copy(alpha=.14f)
+        ){
+            Box(contentAlignment=Alignment.Center){
+                Icon(Icons.Rounded.Shield,contentDescription=null,tint=Color.White,modifier=Modifier.size(44.dp))
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Text("CHETO",color=Color.White,fontSize=38.sp,fontWeight=FontWeight.Black)
+        Text(
+            if(exists)"Desbloquea tu autenticador" else "Crea tu bóveda segura",
+            color=Color.White.copy(alpha=.82f),
+            fontSize=15.sp
+        )
+        Spacer(Modifier.height(24.dp))
+
+        Card(
+            modifier=Modifier.fillMaxWidth(),
+            shape=RoundedCornerShape(30.dp),
+            colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)
+        ){
+            Column(
+                Modifier.padding(22.dp),
+                verticalArrangement=Arrangement.spacedBy(14.dp),
+                horizontalAlignment=Alignment.CenterHorizontally
+            ){
+                Text(
+                    if(exists)"Bienvenido de nuevo" else "Registro inicial",
+                    style=MaterialTheme.typography.headlineSmall,
+                    fontWeight=FontWeight.Bold
+                )
+
+                if(exists){
+                    Text("Introduce tu PIN",style=MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                        repeat(6){ index->
+                            Box(
+                                Modifier.size(14.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if(index<pin.length) Blue
+                                        else MaterialTheme.colorScheme.outline.copy(alpha=.25f)
+                                    )
+                            )
+                        }
+                    }
+                    PinPad(
+                        pin=pin,
+                        onPinChange={pin=it},
+                        onSubmit={
+                            if(pin.length==6){
+                                onLogin(pin)
+                                pin=""
+                            }else onMessage("Completa los 6 dígitos")
+                        }
+                    )
+                    FilledTonalButton(onClick=onBio,modifier=Modifier.fillMaxWidth()){
+                        Icon(Icons.Rounded.Fingerprint,contentDescription=null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Entrar con biometría")
+                    }
+                }else{
+                    Field("Nombre",name,{name=it})
+                    Field("Correo principal",email,{email=it},keyboard=KeyboardType.Email)
+                    Field(
+                        "PIN de 6 dígitos",
+                        pin,
+                        {pin=it.filter(Char::isDigit).take(6)},
+                        password=true,
+                        keyboard=KeyboardType.NumberPassword
+                    )
+                    Field(
+                        "Repite tu PIN",
+                        confirm,
+                        {confirm=it.filter(Char::isDigit).take(6)},
+                        password=true,
+                        keyboard=KeyboardType.NumberPassword
+                    )
+                    Button(
+                        onClick={
+                            when{
+                                name.isBlank() -> onMessage("Escribe tu nombre")
+                                !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() ->
+                                    onMessage("Introduce un correo válido")
+                                pin.length!=6 -> onMessage("El PIN debe tener 6 dígitos")
+                                pin!=confirm -> onMessage("Los PIN no coinciden")
+                                else -> onRegister(name.trim(),email.trim(),pin)
+                            }
+                        },
+                        modifier=Modifier.fillMaxWidth()
+                    ){Text("Crear perfil seguro")}
+                }
+
+                HorizontalDivider()
+                Text(
+                    "Tus códigos TOTP se generan sin internet. PIN y secretos se almacenan cifrados localmente.",
+                    style=MaterialTheme.typography.bodySmall,
+                    color=MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable private fun PinPad(
+    pin:String,
+    onPinChange:(String)->Unit,
+    onSubmit:()->Unit
+){
+    val rows=listOf(
+        listOf("1","2","3"),
+        listOf("4","5","6"),
+        listOf("7","8","9"),
+        listOf("⌫","0","✓")
+    )
+    Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+        rows.forEach { row->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement=Arrangement.spacedBy(10.dp)
+            ){
+                row.forEach { key->
+                    FilledTonalButton(
+                        onClick={
+                            when(key){
+                                "⌫" -> if(pin.isNotEmpty())onPinChange(pin.dropLast(1))
+                                "✓" -> onSubmit()
+                                else -> if(pin.length<6)onPinChange(pin+key)
+                            }
+                        },
+                        modifier=Modifier.weight(1f).height(54.dp),
+                        shape=RoundedCornerShape(18.dp),
+                        contentPadding=PaddingValues(0.dp)
+                    ){
+                        Text(key,fontSize=20.sp,fontWeight=FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 
