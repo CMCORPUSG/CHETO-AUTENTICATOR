@@ -27,7 +27,7 @@ data class MobileVault(
     val pin: String = "", val name: String = "", val emails: List<String> = emptyList(), val photo: String = "",
     val categories: List<String> = listOf("Sin categoría", "Trabajo", "Social", "Personal"),
     val accounts: List<MobileAccount> = emptyList(), val dark: Boolean = false,
-    val hideCodes: Boolean = false, val biometric: Boolean = true, val screenshots: Boolean = false,
+    val hideCodes: Boolean = false, val biometric: Boolean = false, val screenshots: Boolean = false,
     val categoryColors: Map<String, String> = emptyMap()
 )
 
@@ -112,7 +112,7 @@ class NativeVault(context: Context) {
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
-        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 3).put("pin", s.pin)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 4).put("pin", s.pin)
             .put(
                 "profile",
                 JSONObject()
@@ -168,6 +168,7 @@ class NativeVault(context: Context) {
             )
 
         fun decode(root: JSONObject): MobileVault {
+            val version = root.optInt("version", 1)
             val p = root.optJSONObject("profile") ?: JSONObject()
             val settings = root.optJSONObject("settings") ?: JSONObject()
             val arr = root.getJSONArray("accounts")
@@ -222,7 +223,7 @@ class NativeVault(context: Context) {
                 accounts,
                 settings.optBoolean("dark"),
                 settings.optBoolean("hide"),
-                settings.optBoolean("biometric", true),
+                if (version >= 4) settings.optBoolean("biometric", false) else false,
                 settings.optBoolean("screenshots"),
                 categoryColors
             )
@@ -293,7 +294,8 @@ class NativeVault(context: Context) {
                 emails = restored.emails,
                 photo = restored.photo,
                 categories = restored.categories,
-                accounts = restored.accounts
+                accounts = restored.accounts,
+                categoryColors = restored.categoryColors
             )
         }
     }
