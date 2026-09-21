@@ -28,7 +28,8 @@ data class MobileVault(
     val categories: List<String> = listOf("Sin categoría", "Trabajo", "Social", "Personal"),
     val accounts: List<MobileAccount> = emptyList(), val dark: Boolean = false,
     val hideCodes: Boolean = false, val biometric: Boolean = false, val screenshots: Boolean = false,
-    val categoryColors: Map<String, String> = emptyMap()
+    val categoryColors: Map<String, String> = emptyMap(),
+    val lockTimeoutSeconds: Int = 0
 )
 
 class NativeVault(context: Context) {
@@ -145,6 +146,7 @@ class NativeVault(context: Context) {
                     .put("hide", s.hideCodes)
                     .put("biometric", s.biometric)
                     .put("screenshots", s.screenshots)
+                    .put("lockTimeoutSeconds", s.lockTimeoutSeconds)
             )
             .put(
                 "accounts",
@@ -225,7 +227,8 @@ class NativeVault(context: Context) {
                 settings.optBoolean("hide"),
                 if (version >= 4) settings.optBoolean("biometric", false) else false,
                 settings.optBoolean("screenshots"),
-                categoryColors
+                categoryColors,
+                settings.optInt("lockTimeoutSeconds", 0).takeIf { it in setOf(0, 30, 60, 300) } ?: 0
             )
         }
 
