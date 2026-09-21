@@ -1,5 +1,7 @@
 package com.cmcorpusg.chetoauthenticator.ui
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.AccessTime
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.ContentPasteOff
 import androidx.compose.material.icons.rounded.DeleteSweep
@@ -26,6 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -46,6 +50,9 @@ internal fun SecurityCenterScreen(
     val context = LocalContext.current
     val backup = BackupSettings(context)
     val recoveryKeyConfigured = RecoveryKeyStore(context).hasConfiguredKey()
+    val automaticTime = runCatching {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.AUTO_TIME, 0) == 1
+    }.getOrDefault(true)
     val recentBackup = backup.lastBackupEpochMillis > 0L &&
         System.currentTimeMillis() - backup.lastBackupEpochMillis < 48L * 60L * 60L * 1000L
     val protectedCount = listOf(
@@ -55,7 +62,8 @@ internal fun SecurityCenterScreen(
         vault.hideCodes,
         backup.driveEnabled,
         recoveryKeyConfigured,
-        vault.clipboardClearSeconds <= 30
+        vault.clipboardClearSeconds <= 30,
+        automaticTime
     ).count { it }
 
     Column(
@@ -75,7 +83,7 @@ internal fun SecurityCenterScreen(
                     Column {
                         Text("Centro de seguridad", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            "$protectedCount de 7 protecciones recomendadas activas",
+                            "$protectedCount de 8 protecciones recomendadas activas",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -124,6 +132,22 @@ internal fun SecurityCenterScreen(
             "Los códigos se limpian en ${vault.clipboardClearSeconds} segundos o al bloquear CHETO",
             vault.clipboardClearSeconds <= 30
         )
+        SecurityStatus(
+            Icons.Rounded.AccessTime,
+            "Hora del dispositivo",
+            if (automaticTime) "Hora automática activa · TOTP sincronizado con el reloj del sistema" else "Hora automática desactivada · los códigos podrían no coincidir",
+            automaticTime
+        )
+        if (!automaticTime) {
+            OutlinedButton(
+                onClick = {
+                    context.startActivity(Intent(Settings.ACTION_DATE_SETTINGS))
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Abrir ajustes de fecha y hora")
+            }
+        }
         SecurityStatus(
             Icons.Rounded.DeleteSweep,
             "Papelera cifrada",
