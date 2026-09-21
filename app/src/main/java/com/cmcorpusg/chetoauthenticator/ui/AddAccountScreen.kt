@@ -66,7 +66,7 @@ internal fun AddAccountScreen(
                     IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Volver") }
                     Column(Modifier.weight(1f)) {
                         Text("Agregar cuenta", style = MaterialTheme.typography.headlineSmall)
-                        Text("Elige cómo empezar", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("QR individual, migración o clave manual", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -77,9 +77,16 @@ internal fun AddAccountScreen(
                 ) {
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            AddMethodCard(Icons.Rounded.QrCodeScanner, "Escanear QR", "Usa la cámara", Modifier.weight(1f)) { onScan(false) }
-                            AddMethodCard(Icons.Rounded.PhotoLibrary, "Desde imagen", "Busca en galería", Modifier.weight(1f)) { onScan(true) }
+                            AddMethodCard(Icons.Rounded.QrCodeScanner, "Escanear QR", "Cuenta o migración", Modifier.weight(1f)) { onScan(false) }
+                            AddMethodCard(Icons.Rounded.PhotoLibrary, "Desde imagen", "Cuenta o migración", Modifier.weight(1f)) { onScan(true) }
                         }
+                    }
+                    item {
+                        Text(
+                            "Compatible con QR TOTP y exportaciones de Google Authenticator con varias cuentas.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     item {
                         Card(
