@@ -777,8 +777,10 @@ class NativeActivity : FragmentActivity() {
                 val payload=NativeVault.export(current,password)
                 OneDriveBackupClient("cheto_native_backup_").upload(token,payload)
                 RecoveryKeyStore(this@NativeActivity,"onedrive").configure(password.toCharArray())
+                val plain=NativeVault.exportPortableJson(current)
                 BackupSettings(this@NativeActivity).apply {
                     oneDriveEnabled=true
+                    lastOneDriveContentHash=BackupContentFingerprint.sha256(plain)
                     lastOneDriveBackupEpochMillis=System.currentTimeMillis()
                     lastError=null
                 }
@@ -850,8 +852,10 @@ class NativeActivity : FragmentActivity() {
                         work("Copia cifrada guardada en Google Drive") {
                             DriveBackupClient("cheto_native_backup_").upload(token,payload)
                             RecoveryKeyStore(this@NativeActivity).configure(password.toCharArray())
+                            val plain=NativeVault.exportPortableJson(current)
                             BackupSettings(this@NativeActivity).apply {
                                 driveEnabled=true
+                                lastGoogleContentHash=BackupContentFingerprint.sha256(plain)
                                 lastBackupEpochMillis=System.currentTimeMillis()
                                 lastError=null
                             }
