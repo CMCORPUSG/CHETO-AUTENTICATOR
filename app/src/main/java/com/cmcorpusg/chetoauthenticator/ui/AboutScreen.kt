@@ -32,6 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cmcorpusg.chetoauthenticator.BuildConfig
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
+import com.cmcorpusg.chetoauthenticator.backup.RecoveryHealthPolicy
+import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
 import com.cmcorpusg.chetoauthenticator.data.MobileVault
 
 @Composable
@@ -43,6 +45,13 @@ internal fun AboutScreen(
 ) {
     val context = LocalContext.current
     val backup = BackupSettings(context)
+    val recoveryHealth = RecoveryHealthPolicy.evaluate(
+        vault = vault,
+        driveEnabled = backup.driveEnabled,
+        lastBackupEpochMillis = backup.lastBackupEpochMillis,
+        lastVerifiedBackupEpochMillis = backup.lastVerifiedBackupEpochMillis,
+        recoveryKeyConfigured = RecoveryKeyStore(context).hasConfiguredKey()
+    )
     val linkedGoogle = vault.linkedIdentities.any { it.provider == "google" }
     val linkedMicrosoft = vault.linkedIdentities.any { it.provider == "microsoft" }
 
@@ -99,6 +108,12 @@ internal fun AboutScreen(
                     "Backup automático",
                     if (backup.driveEnabled) "Activo" else "No configurado"
                 )
+                GroupDividerLocal()
+                DiagnosticRow(
+                    Icons.Rounded.CheckCircle,
+                    "Salud de recuperación",
+                    "${recoveryHealth.label} · ${recoveryHealth.score}/${recoveryHealth.total}"
+                )
             }
         }
 
@@ -140,6 +155,12 @@ internal fun AboutScreen(
                     Icons.Rounded.PhoneAndroid,
                     "Equipo",
                     "${Build.MANUFACTURER} ${Build.MODEL}"
+                )
+                GroupDividerLocal()
+                DiagnosticRow(
+                    Icons.Rounded.Info,
+                    "Build",
+                    if (BuildConfig.DEBUG) "Debug" else "Release"
                 )
             }
         }
