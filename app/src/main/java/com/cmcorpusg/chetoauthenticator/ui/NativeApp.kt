@@ -559,6 +559,23 @@ private fun categoryColor(name:String):Color{
                     a=a.copy(issuer=value)
                     if(logoDomain.isBlank())logoDomain=ServiceCatalog.domainFor(value).orEmpty()
                 })
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement=Arrangement.spacedBy(8.dp)
+                ){
+                    ServiceCatalog.suggestions.forEach { service->
+                        AssistChip(
+                            onClick={
+                                a=a.copy(
+                                    issuer=service,
+                                    photo=ServiceCatalog.logoUrlFor(service).orEmpty()
+                                )
+                                logoDomain=ServiceCatalog.domainFor(service).orEmpty()
+                            },
+                            label={Text(service)}
+                        )
+                    }
+                }
                 Field("Dominio para logo (opcional)",logoDomain,{logoDomain=it.trim()})
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     OutlinedButton(
@@ -686,7 +703,7 @@ private fun categoryColor(name:String):Color{
         Setting("Modo oscuro",v.dark){onUpdate(v.copy(dark=it))}
         OutlinedButton(onClick=onPin,modifier=Modifier.fillMaxWidth()){Text("Cambiar PIN")}
         OutlinedButton(onClick=onCategories,modifier=Modifier.fillMaxWidth()){Text("Gestionar categorías")}
-        Text("CHETO Authenticator 0.5.0\nAndroid nativo · Kotlin + Jetpack Compose",style=MaterialTheme.typography.bodySmall)
+        Text("CHETO Authenticator 0.6.0\nAndroid nativo · Kotlin + Jetpack Compose",style=MaterialTheme.typography.bodySmall)
     }
 }
 
