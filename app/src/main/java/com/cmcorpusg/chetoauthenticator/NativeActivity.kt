@@ -721,6 +721,29 @@ class NativeActivity : FragmentActivity() {
             } }
             return
         }
+        if(mode.startsWith("driveMergeId:")){
+            val fileId=mode.substringAfter("driveMergeId:")
+            drive { token -> work("Copia histórica de Drive fusionada") {
+                val data=DriveBackupClient("cheto_native_backup_").download(token,fileId)
+                val restored=NativeVault.restore(data,password,current)
+                val merged=VaultMergePolicy.merge(current,restored)
+                store.write(merged)
+                withContext(Dispatchers.Main){if(vault!=null)vault=merged}
+            } }
+            return
+        }
+
+        if(mode.startsWith("driveDeleteId:")){
+            val fileId=mode.substringAfter("driveDeleteId:")
+            drive { token -> work("Copia de Drive eliminada") {
+                val client=DriveBackupClient("cheto_native_backup_")
+                client.delete(token,fileId)
+                val history=client.listRecentBackups(token)
+                withContext(Dispatchers.Main){driveBackups=history}
+            } }
+            return
+        }
+
 
         when(mode){
             "restore"->{pendingRestoreMode="replace";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
