@@ -37,9 +37,11 @@ import com.cmcorpusg.chetoauthenticator.data.MobileVault
 @Composable
 internal fun SettingsPage(
     vault: MobileVault,
+    biometricReady: Boolean,
     onUpdate: (MobileVault) -> Unit,
     onCategories: () -> Unit,
-    onPin: () -> Unit
+    onPin: () -> Unit,
+    onBiometricSetup: () -> Unit
 ) {
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 16.dp),
@@ -50,7 +52,28 @@ internal fun SettingsPage(
         }
 
         SettingsGroup("Seguridad") {
-            ToggleRow(Icons.Rounded.Fingerprint, "Biometría", "Entrar con huella o rostro", vault.biometric) { onUpdate(vault.copy(biometric = it)) }
+            ToggleRow(
+                Icons.Rounded.Fingerprint,
+                "Biometría",
+                when {
+                    vault.biometric && biometricReady -> "Huella/biometría confirmada y lista"
+                    vault.biometric && !biometricReady -> "Falta registrar biometría en Android"
+                    biometricReady -> "Disponible · activa y confirma tu identidad"
+                    else -> "Toca para registrar una huella en Android"
+                },
+                vault.biometric && biometricReady
+            ) { enabled ->
+                if (enabled) onBiometricSetup() else onUpdate(vault.copy(biometric = false))
+            }
+            if (!biometricReady) {
+                GroupDivider()
+                ActionRow(
+                    Icons.Rounded.Fingerprint,
+                    "Registrar huella",
+                    "Abre el asistente seguro de Android",
+                    onBiometricSetup
+                )
+            }
             GroupDivider()
             ToggleRow(Icons.Rounded.VisibilityOff, "Ocultar códigos", "Revelar cada TOTP al tocar", vault.hideCodes) { onUpdate(vault.copy(hideCodes = it)) }
             GroupDivider()
@@ -65,7 +88,7 @@ internal fun SettingsPage(
             ActionRow(Icons.Rounded.Category, "Categorías", "Organiza cuentas y colores", onCategories)
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("CHETO Authenticator 0.7.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("CHETO Authenticator 0.8.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Android nativo · Kotlin + Compose", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
