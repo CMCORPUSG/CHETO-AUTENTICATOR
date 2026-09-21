@@ -101,6 +101,7 @@ fun NativeApp(
             var changePin by remember { mutableStateOf(false) }
             var manageCategories by remember { mutableStateOf(false) }
             var securityCenter by remember { mutableStateOf(false) }
+            var about by remember { mutableStateOf(false) }
             var critical by remember { mutableStateOf<PendingCriticalAction?>(null) }
             var clockMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
             LaunchedEffect(Unit){ while(true){ clockMillis=System.currentTimeMillis(); delay(30_000) } }
@@ -111,6 +112,7 @@ fun NativeApp(
                 addAccount->addAccount=false
                 manageCategories->manageCategories=false
                 securityCenter->securityCenter=false
+                about->about=false
                 page!="Inicio"->page="Inicio"
                 else->onLock()
             } }
@@ -131,6 +133,7 @@ fun NativeApp(
                                     when {
                                         manageCategories -> "Categorías"
                                         securityCenter -> "Centro de seguridad"
+                                        about -> "Acerca de CHETO"
                                         else -> page
                                     },
                                     color=Color.White,
@@ -142,7 +145,7 @@ fun NativeApp(
                             IconButton(onClick=onLock){Icon(Icons.Rounded.Lock,contentDescription="Bloquear",tint=Color.White)}
                         }
                     }
-                },bottomBar={if(!manageCategories&&!securityCenter)NavigationBar(containerColor=MaterialTheme.colorScheme.surface,tonalElevation=3.dp) {
+                },bottomBar={if(!manageCategories&&!securityCenter&&!about)NavigationBar(containerColor=MaterialTheme.colorScheme.surface,tonalElevation=3.dp) {
                     val destinations=listOf(
                         Triple("Inicio",Icons.Rounded.Home,"Inicio"),
                         Triple("Backup",Icons.Rounded.Cloud,"Backup"),
@@ -157,13 +160,19 @@ fun NativeApp(
                             label={Text(label)}
                         )
                     }
-                }},floatingActionButton={if(page=="Inicio"&&!manageCategories&&!securityCenter)FloatingActionButton(onClick={addAccount=true},containerColor=Blue,contentColor=Color.White,shape=RoundedCornerShape(17.dp)){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
+                }},floatingActionButton={if(page=="Inicio"&&!manageCategories&&!securityCenter&&!about)FloatingActionButton(onClick={addAccount=true},containerColor=Blue,contentColor=Color.White,shape=RoundedCornerShape(17.dp)){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
             ){padding->
                 Column(Modifier.padding(padding).fillMaxSize()){
                     if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
                     when {
                         manageCategories -> CategoryManagerScreen(vault,onUpdate,{manageCategories=false},onMessage)
                         securityCenter -> SecurityCenterScreen(vault,biometricReady,onLock)
+                        about -> AboutScreen(
+                            vault=vault,
+                            biometricReady=biometricReady,
+                            googleConfigured=googleIdentityConfigured,
+                            microsoftConfigured=microsoftIdentityConfigured
+                        )
                         else -> when(page){
                             "Inicio"->HomeScreen(
                                 vault,
@@ -228,6 +237,7 @@ fun NativeApp(
                                 {changePin=true},
                                 onBiometricSetup,
                                 {securityCenter=true},
+                                {about=true},
                                 {title,action->
                                     critical=PendingCriticalAction(
                                         title,
