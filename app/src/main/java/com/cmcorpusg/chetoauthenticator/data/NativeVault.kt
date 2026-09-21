@@ -85,6 +85,14 @@ class NativeVault(context: Context) {
         }
     }
 
+    fun resetPinLockout() {
+        prefs.edit()
+            .putInt("attempts", 0)
+            .putInt("lockCycle", 0)
+            .remove("lockedUntil")
+            .commit()
+    }
+
     fun legacyAccounts() = legacy.load().map {
         MobileAccount(
             it.id,
