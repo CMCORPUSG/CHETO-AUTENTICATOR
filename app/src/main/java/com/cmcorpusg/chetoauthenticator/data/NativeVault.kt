@@ -23,6 +23,11 @@ data class MobileAccount(
     val favorite: Boolean = false
 )
 
+data class TrashedAccount(
+    val account: MobileAccount,
+    val deletedAtEpochMillis: Long = System.currentTimeMillis()
+)
+
 data class LinkedIdentity(
     val provider: String,
     val subject: String,
@@ -41,7 +46,8 @@ data class MobileVault(
     val hideCodes: Boolean = false, val biometric: Boolean = false, val screenshots: Boolean = false,
     val categoryColors: Map<String, String> = emptyMap(),
     val lockTimeoutSeconds: Int = 0,
-    val linkedIdentities: List<LinkedIdentity> = emptyList()
+    val linkedIdentities: List<LinkedIdentity> = emptyList(),
+    val trash: List<TrashedAccount> = emptyList()
 )
 
 class NativeVault(context: Context) {
@@ -149,7 +155,7 @@ class NativeVault(context: Context) {
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
-        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 7).put("pin", s.pin)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 8).put("pin", s.pin)
             .put(
                 "profile",
                 JSONObject()
@@ -221,13 +227,38 @@ class NativeVault(context: Context) {
                     }
                 }
             )
+            .put(
+                "trash",
+                JSONArray().apply {
+                    s.trash.forEach { trashed ->
+                        val a = trashed.account
+                        put(
+                            JSONObject()
+                                .put("deletedAt", trashed.deletedAtEpochMillis)
+                                .put("id", a.id)
+                                .put("issuer", a.issuer)
+                                .put("label", a.label)
+                                .put("secret", a.secret)
+                                .put("category", a.category)
+                                .put("notes", a.notes)
+                                .put("digits", a.digits)
+                                .put("period", a.period)
+                                .put("alg", a.algorithm)
+                                .put("logoUrl", a.photo)
+                                .put("favorite", a.favorite)
+                        )
+                    }
+                }
+            )
 
         fun decode(root: JSONObject): MobileVault {
             val version = root.optInt("version", 1)
             val p = root.optJSONObject("profile") ?: JSONObject()
             val settings = root.optJSONObject("settings") ?: JSONObject()
             val arr = root.getJSONArray("accounts")
+            val trashArray = root.optJSONArray("trash") ?: JSONArray()
             require(arr.length() <= 2000) { "Demasiadas cuentas" }
+            require(trashArray.length() <= 2000) { "Demasiadas cuentas en papelera" }
 
             val cats = root.optJSONArray("categories") ?: JSONArray()
             val categories = (
@@ -262,8 +293,7 @@ class NativeVault(context: Context) {
                     if (value.matches(Regex("#[0-9A-Fa-f]{6}"))) put(key, value.uppercase())
                 }
             }
-            val accounts = (0 until arr.length()).map { i ->
-                val a = arr.getJSONObject(i)
+            fun decodeAccount(a: JSONObject): MobileAccount =
                 MobileAccount(
                     a.optString("id", UUID.randomUUID().toString()),
                     a.getString("issuer"),
@@ -285,6 +315,18 @@ class NativeVault(context: Context) {
                         algorithm = it.algorithm
                     )
                 }
+
+            val accounts = (0 until arr.length()).map { i ->
+                decodeAccount(arr.getJSONObject(i))
+            }
+            val trash = (0 until trashArray.length()).mapNotNull { i ->
+                val item = trashArray.optJSONObject(i) ?: return@mapNotNull null
+                runCatching {
+                    TrashedAccount(
+                        account = decodeAccount(item),
+                        deletedAtEpochMillis = item.optLong("deletedAt", 0L).coerceAtLeast(0L)
+                    )
+                }.getOrNull()
             }
 
             return MobileVault(
@@ -302,7 +344,8 @@ class NativeVault(context: Context) {
                 settings.optBoolean("screenshots"),
                 categoryColors,
                 settings.optInt("lockTimeoutSeconds", 0).takeIf { it in setOf(0, 30, 60, 300) } ?: 0,
-                linkedIdentities
+                linkedIdentities,
+                trash
             )
         }
 
@@ -373,7 +416,8 @@ class NativeVault(context: Context) {
                 categories = restored.categories,
                 accounts = restored.accounts,
                 categoryColors = restored.categoryColors,
-                linkedIdentities = restored.linkedIdentities
+                linkedIdentities = restored.linkedIdentities,
+                trash = restored.trash
             )
         }
     }
