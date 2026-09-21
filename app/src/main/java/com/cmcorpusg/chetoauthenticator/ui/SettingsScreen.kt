@@ -174,7 +174,7 @@ internal fun SettingsPage(
             ActionRow(Icons.Rounded.Info, "Acerca de y diagnóstico", "Versión, proveedores, dispositivo y privacidad", onAbout)
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("CHETO Authenticator 0.12.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("CHETO Authenticator 0.13.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Android nativo · Kotlin + Compose", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
