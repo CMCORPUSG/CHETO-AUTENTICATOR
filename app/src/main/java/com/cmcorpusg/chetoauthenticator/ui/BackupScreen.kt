@@ -58,9 +58,12 @@ internal fun BackupPage(
     val context = LocalContext.current
     val settings = remember { BackupSettings(context) }
     val recovery = remember { RecoveryKeyStore(context) }
-    var automatic by remember { mutableStateOf(settings.driveEnabled) }
+    var automatic by remember { mutableStateOf(settings.driveEnabled || settings.oneDriveEnabled) }
     var oneDriveConnected by remember { mutableStateOf(settings.oneDriveEnabled) }
-    LaunchedEffect(busy) { automatic = settings.driveEnabled }
+    LaunchedEffect(busy) {
+        automatic = settings.driveEnabled || settings.oneDriveEnabled
+        oneDriveConnected = settings.oneDriveEnabled
+    }
     val lastBackup = if (settings.lastBackupEpochMillis > 0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Sin copias todavía"
     val lastVerified = if (settings.lastVerifiedBackupEpochMillis > 0) {
         LimaClock.nowLabel(settings.lastVerifiedBackupEpochMillis)
@@ -163,7 +166,7 @@ internal fun BackupPage(
         BackupOptionCard(
             icon = Icons.Rounded.Cloud,
             title = "Google Drive",
-            subtitle = "Cifrado antes de subir; CHETO solo usa su carpeta privada",
+            subtitle = "Una sola copia .cheto cifrada; cada ~24 h se reemplaza solo si hubo cambios",
             primaryLabel = if (automatic) "Sincronizar ahora" else "Conectar Drive",
             secondaryLabel = "Restaurar desde Drive",
             enabled = !busy,
@@ -177,12 +180,12 @@ internal fun BackupPage(
                 modifier = Modifier.fillMaxWidth().height(43.dp),
                 shape = ControlShape
             ) {
-                Text(if (driveBackups.isEmpty()) "Cargar historial de Drive" else "Actualizar historial de Drive")
+                Text(if (driveBackups.isEmpty()) "Ver copia actual de Drive" else "Actualizar copia actual")
             }
         }
 
         if (driveBackups.isNotEmpty()) {
-            SectionHeader("Historial de Drive", "CHETO conserva hasta 7 copias cifradas")
+            SectionHeader("Copia actual de Drive", "CHETO mantiene una sola copia para ahorrar espacio")
             driveBackups.forEachIndexed { index, backup ->
                 PremiumCard(Modifier.fillMaxWidth()) {
                     Column(
@@ -191,7 +194,7 @@ internal fun BackupPage(
                     ) {
                         val millis = runCatching { Instant.parse(backup.modifiedTime).toEpochMilli() }.getOrNull()
                         Text(
-                            if (index == 0) "Copia más reciente" else "Copia ${index + 1}",
+                            "CHETO-BACKUP.cheto",
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
@@ -270,7 +273,7 @@ internal fun BackupPage(
             icon = Icons.Rounded.Cloud,
             title = "Microsoft OneDrive",
             subtitle = if (microsoftConfigured) {
-                "Copia .cheto cifrada dentro de la carpeta privada de CHETO en OneDrive"
+                "Una sola copia .cheto cifrada; cada ~24 h se reemplaza solo si hubo cambios"
             } else {
                 "Falta configurar la aplicación Microsoft Entra para habilitar OneDrive"
             },
