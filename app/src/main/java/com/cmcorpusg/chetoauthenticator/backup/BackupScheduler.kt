@@ -30,6 +30,12 @@ object BackupScheduler {
         )
     }
 
+    fun disable(context: Context) {
+        val workManager = WorkManager.getInstance(context)
+        workManager.cancelUniqueWork(PERIODIC_NAME)
+        workManager.cancelUniqueWork(IMMEDIATE_NAME)
+    }
+
     fun runNow(context: Context) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
