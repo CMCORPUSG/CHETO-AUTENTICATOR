@@ -58,6 +58,7 @@ class NativeActivity : FragmentActivity() {
     private var autoLockJob: Job? = null
     private var backgroundAtMillis: Long = 0L
     private var pendingBiometricEnable = false
+    private var lastCopiedCode: String? = null
     private val enrollBiometric = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         external=false
         if(pendingBiometricEnable){
@@ -141,7 +142,7 @@ class NativeActivity : FragmentActivity() {
                         store.read()
                     }.onSuccess { persisted->vault=persisted;exists=true }
                         .onFailure { message("No se pudo guardar el perfil") }
-                },onBiometric=::biometric,onBiometricSetup=::requestBiometricSetup,onChangePin=::changePin,onUpdate=::update,
+                },onBiometric=::biometric,onBiometricSetup=::requestBiometricSetup,onVerifyPin=::verifyPin,onVerifyBiometric=::reauthenticateBiometric,onChangePin=::changePin,onUpdate=::update,
                 onScan={ photo -> external=true;if(photo)pickQr.launch("image/*") else GmsBarcodeScanning.getClient(this).startScan()
                     .addOnSuccessListener { it.rawValue?.let(::receiveQr) }.addOnFailureListener { message("Escáner no disponible. Usa una imagen o la clave manual.") }
                     .addOnCompleteListener { external=false } },
@@ -161,11 +162,13 @@ class NativeActivity : FragmentActivity() {
             if(elapsed>=current.lockTimeoutSeconds*1000L) lockNow()
         }
         backgroundAtMillis=0L
+        vault?.let(::applySettings)
     }
     override fun onStop(){
         super.onStop()
         if(!external){
             window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            clearSensitiveClipboard()
             scanned=null
             stagedPhoto=null
             val current=vault ?: return
@@ -189,6 +192,7 @@ class NativeActivity : FragmentActivity() {
         vault=null
         scanned=null
         stagedPhoto=null
+        clearSensitiveClipboard()
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
     private fun applySettings(s: MobileVault){if(s.screenshots)window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) else window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)}
@@ -204,6 +208,42 @@ class NativeActivity : FragmentActivity() {
             }
         }.onFailure { message("No se pudieron guardar los cambios") }
     }
+    private fun verifyPin(pin:String):Boolean =
+        runCatching {
+            store.unlock(pin)
+            true
+        }.getOrElse {
+            message(it.message ?: "PIN incorrecto")
+            false
+        }
+
+    private fun reauthenticateBiometric(onSuccess:()->Unit){
+        val state=runCatching { store.read() }.getOrNull()
+        if(state?.biometric!=true || !biometricReady){
+            message("Usa tu PIN para confirmar esta acción")
+            return
+        }
+        external=true
+        BiometricPrompt(this,ContextCompat.getMainExecutor(this),object:BiometricPrompt.AuthenticationCallback(){
+            override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult){
+                external=false
+                onSuccess()
+            }
+            override fun onAuthenticationError(code:Int,text:CharSequence){
+                external=false
+                message("Acción no confirmada")
+            }
+            override fun onAuthenticationFailed(){message("Huella no reconocida")}
+        }).authenticate(
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Confirmar acción")
+                .setSubtitle("Verifica tu identidad para continuar")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                .setNegativeButtonText("Usar PIN")
+                .build()
+        )
+    }
+
     private fun changePin(currentPin:String,newPin:String){
         runCatching {
             val verified=store.unlock(currentPin)
@@ -225,23 +265,45 @@ class NativeActivity : FragmentActivity() {
     private fun receiveQr(raw:String){
         if(vault==null)return
         runCatching { OtpAuthParser.parse(raw).also { TotpEngine.generate(it.secret,digits=it.digits,period=it.period,algorithm=it.algorithm) } }
-            .onSuccess { scanned=MobileAccount(
-                issuer=it.issuer,
-                label=it.label,
-                secret=it.secret,
-                digits=it.digits,
-                period=it.period,
-                algorithm=it.algorithm,
-                photo=ServiceCatalog.logoUrlFor(it.issuer).orEmpty()
-            ) }
+            .onSuccess {
+                val candidate=MobileAccount(
+                    issuer=it.issuer,
+                    label=it.label,
+                    secret=it.secret,
+                    digits=it.digits,
+                    period=it.period,
+                    algorithm=it.algorithm,
+                    photo=ServiceCatalog.logoUrlFor(it.issuer).orEmpty()
+                )
+                val duplicate=AccountPolicy.findDuplicate(candidate,vault?.accounts.orEmpty())
+                if(duplicate!=null) message("Esta cuenta ya existe en CHETO")
+                else scanned=candidate
+            }
             .onFailure { message("QR TOTP inválido") }
     }
     private fun copyCode(value:String){
         val clip=ClipData.newPlainText("Código 2FA",value)
         clip.description.extras=android.os.PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE",true) }
         val clipboard=getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(clip);message("Código copiado")
-        lifecycleScope.launch { delay(30_000);if(clipboard.primaryClip?.getItemAt(0)?.text?.toString()==value)clipboard.setPrimaryClip(ClipData.newPlainText("","")) }
+        clipboard.setPrimaryClip(clip)
+        lastCopiedCode=value
+        message("Código copiado")
+        lifecycleScope.launch {
+            delay(30_000)
+            if(clipboard.primaryClip?.getItemAt(0)?.text?.toString()==value){
+                clipboard.setPrimaryClip(ClipData.newPlainText("",""))
+            }
+            if(lastCopiedCode==value) lastCopiedCode=null
+        }
+    }
+
+    private fun clearSensitiveClipboard(){
+        val expected=lastCopiedCode ?: return
+        val clipboard=getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        if(clipboard.primaryClip?.getItemAt(0)?.text?.toString()==expected){
+            clipboard.setPrimaryClip(ClipData.newPlainText("",""))
+        }
+        lastCopiedCode=null
     }
     private fun refreshBiometricReady(){
         biometricReady=BiometricManager.from(this)
