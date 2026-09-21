@@ -67,6 +67,9 @@ class NativeActivity : FragmentActivity() {
     private var backgroundAtMillis: Long = 0L
     private var pendingBiometricEnable = false
     private var lastCopiedCode: String? = null
+    private var migrationBatchId: Long? = null
+    private var migrationBatchSize: Int = 0
+    private val migrationPages = mutableSetOf<Int>()
     private val enrollBiometric = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         external=false
         if(pendingBiometricEnable){
@@ -508,7 +511,25 @@ class NativeActivity : FragmentActivity() {
                 parts += "${accepted.size} cuenta(s) importada(s)"
                 if(duplicates>0) parts += "$duplicates duplicada(s) omitida(s)"
                 if(payload.skippedUnsupported>0) parts += "${payload.skippedUnsupported} no compatible(s)"
-                if(payload.batchSize>1) parts += "QR ${payload.batchIndex+1} de ${payload.batchSize}"
+                if(payload.batchSize>1){
+                    val incomingBatchId=payload.batchId
+                    if(migrationBatchId!=incomingBatchId || migrationBatchSize!=payload.batchSize){
+                        migrationBatchId=incomingBatchId
+                        migrationBatchSize=payload.batchSize
+                        migrationPages.clear()
+                    }
+                    migrationPages += payload.batchIndex
+                    val missing=(0 until payload.batchSize).filterNot { it in migrationPages }
+                    if(missing.isEmpty()){
+                        parts += "Migración completa (${payload.batchSize}/${payload.batchSize})"
+                        migrationBatchId=null
+                        migrationBatchSize=0
+                        migrationPages.clear()
+                    }else{
+                        parts += "Lote ${migrationPages.size}/${payload.batchSize}"
+                        parts += "faltan QR " + missing.joinToString(", ") { (it+1).toString() }
+                    }
+                }
                 message(parts.joinToString(" · "))
             }
             .onFailure { message("No se pudo importar el QR de Google Authenticator") }
