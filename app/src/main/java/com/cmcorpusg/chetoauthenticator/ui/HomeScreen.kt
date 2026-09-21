@@ -248,6 +248,15 @@ internal fun HomeScreen(
                             )
                             AssistChip(
                                 enabled = selectedIds.isNotEmpty(),
+                                onClick = {
+                                    onBulkFavorite(selectedIds, false)
+                                    selectedIds = emptySet()
+                                },
+                                label = { Text("Quitar fav.") },
+                                leadingIcon = { Icon(Icons.Rounded.StarBorder, null, Modifier.size(17.dp)) }
+                            )
+                            AssistChip(
+                                enabled = selectedIds.isNotEmpty(),
                                 onClick = { showMoveCategory = true },
                                 label = { Text("Mover") },
                                 leadingIcon = { Icon(Icons.Rounded.DriveFileMove, null, Modifier.size(17.dp)) }
@@ -385,7 +394,7 @@ private fun TotpCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     if (hidden) "••• •••" else code.chunked(if (account.digits == 6) 3 else 4).joinToString(" "),
-                    modifier = Modifier.weight(1f).clickable(onClick = onCodeClick),
+                    modifier = Modifier.weight(1f).clickable(onClick = if (selectionMode) onSelect else onCodeClick),
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.2.sp
