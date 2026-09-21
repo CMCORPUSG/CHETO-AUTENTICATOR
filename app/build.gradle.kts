@@ -26,8 +26,8 @@ android {
         applicationId = "com.cmcorpusg.chetoauthenticator"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.11.0"
+        versionCode = 12
+        versionName = "0.12.0"
 
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", googleWebClientId.asBuildConfigString())
         buildConfigField("String", "MICROSOFT_CLIENT_ID", microsoftClientId.asBuildConfigString())
@@ -106,6 +106,7 @@ dependencies {
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")
     implementation("com.microsoft.identity.client:msal:8.4.1")
+    implementation("com.google.crypto.tink:tink-android:1.23.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:core-ktx:1.7.0")
