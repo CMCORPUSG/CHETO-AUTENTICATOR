@@ -3,52 +3,61 @@ package com.cmcorpusg.chetoauthenticator.backup
 import android.content.Context
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
 
 object BackupScheduler {
-    private const val PERIODIC_NAME = "cheto-drive-backup-24h"
-    private const val IMMEDIATE_NAME = "cheto-drive-backup-now"
+    private const val GOOGLE_PERIODIC_NAME = "cheto-google-drive-backup-24h"
+    private const val ONEDRIVE_PERIODIC_NAME = "cheto-onedrive-backup-24h"
 
     fun schedule(context: Context) {
+        val settings = BackupSettings(context)
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        val request = PeriodicWorkRequestBuilder<NativeDriveBackupWorker>(24, TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .build()
+        val manager = WorkManager.getInstance(context)
 
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            PERIODIC_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request
-        )
+        if (settings.driveEnabled) {
+            val google = PeriodicWorkRequestBuilder<NativeDriveBackupWorker>(24, TimeUnit.HOURS)
+                .setConstraints(constraints)
+                .build()
+            manager.enqueueUniquePeriodicWork(
+                GOOGLE_PERIODIC_NAME,
+                ExistingPeriodicWorkPolicy.UPDATE,
+                google
+            )
+        } else {
+            manager.cancelUniqueWork(GOOGLE_PERIODIC_NAME)
+        }
+
+        if (settings.oneDriveEnabled) {
+            val microsoft = PeriodicWorkRequestBuilder<NativeOneDriveBackupWorker>(24, TimeUnit.HOURS)
+                .setConstraints(constraints)
+                .build()
+            manager.enqueueUniquePeriodicWork(
+                ONEDRIVE_PERIODIC_NAME,
+                ExistingPeriodicWorkPolicy.UPDATE,
+                microsoft
+            )
+        } else {
+            manager.cancelUniqueWork(ONEDRIVE_PERIODIC_NAME)
+        }
+    }
+
+    fun disableGoogle(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(GOOGLE_PERIODIC_NAME)
+    }
+
+    fun disableOneDrive(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(ONEDRIVE_PERIODIC_NAME)
     }
 
     fun disable(context: Context) {
-        val workManager = WorkManager.getInstance(context)
-        workManager.cancelUniqueWork(PERIODIC_NAME)
-        workManager.cancelUniqueWork(IMMEDIATE_NAME)
-    }
-
-    fun runNow(context: Context) {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-
-        val request = OneTimeWorkRequestBuilder<NativeDriveBackupWorker>()
-            .setConstraints(constraints)
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            IMMEDIATE_NAME,
-            ExistingWorkPolicy.REPLACE,
-            request
-        )
+        val manager = WorkManager.getInstance(context)
+        manager.cancelUniqueWork(GOOGLE_PERIODIC_NAME)
+        manager.cancelUniqueWork(ONEDRIVE_PERIODIC_NAME)
     }
 }
