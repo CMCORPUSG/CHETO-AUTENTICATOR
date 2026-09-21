@@ -17,6 +17,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.Screenshot
+import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.PhotoLibrary
