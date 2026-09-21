@@ -9,6 +9,7 @@
         android:fullBackupContent="false"
         android:label="CHETO Authenticator"
         android:icon="@drawable/ic_cheto"
+        android:enableOnBackInvokedCallback="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.ChetoAuthenticator"
         android:usesCleartextTraffic="false">
