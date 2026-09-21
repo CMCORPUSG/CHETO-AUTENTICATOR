@@ -297,7 +297,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun backupAfterChange() {
-        if (backupEnabled) BackupScheduler.runNow(this)
+        if (backupEnabled) BackupScheduler.schedule(this)
     }
 
     private fun mainExecutor(): Executor =
