@@ -235,6 +235,11 @@ internal fun UserProfileScreen(
                                     )
                                 }
                             }
+                            if (!verified) {
+                                IconButton(onClick = { onVerifyEmail(value) }) {
+                                    Icon(Icons.Rounded.CheckCircle, "Verificar correo", tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
                             if (index != 0) {
                                 IconButton(onClick = { onUpdate(vault.copy(emails = listOf(value) + (vault.emails - value))) }) {
                                     Icon(Icons.Rounded.Star, "Hacer principal")
@@ -280,8 +285,14 @@ internal fun UserProfileScreen(
                         when {
                             !Patterns.EMAIL_ADDRESS.matcher(normalized).matches() ->
                                 onMessage("Introduce un correo válido")
-                            vault.emails.any { it.equals(normalized, true) } ->
-                                onMessage("Ese correo ya está en tu perfil")
+                            vault.emails.any { it.equals(normalized, true) } -> {
+                                if (vault.verifiedEmails.any { it.equals(normalized, true) }) {
+                                    onMessage("Ese correo ya está verificado en tu perfil")
+                                } else {
+                                    onVerifyEmail(normalized)
+                                    email = ""
+                                }
+                            }
                             else -> {
                                 onVerifyEmail(normalized)
                                 email = ""
