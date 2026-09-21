@@ -113,8 +113,12 @@ class NativeActivity : FragmentActivity() {
             NativeApp(vault,exists,busy,scanned,stagedPhoto,
                 onLogin={ pin -> runCatching { store.unlock(pin) }.onSuccess { vault=it;applySettings(it) }.onFailure { message(it.message?:"No se pudo abrir el perfil") } },
                 onRegister={ name,email,pin ->
-                    if(!store.exists())runCatching { MobileVault(pin=pin,name=name,emails=listOf(email),accounts=store.legacyAccounts()).also { store.write(it) } }
-                        .onSuccess { vault=it;exists=true }.onFailure { message("No se pudo guardar el perfil") }
+                    if(!store.exists())runCatching {
+                        val initial=MobileVault(pin=pin,name=name,emails=listOf(email),accounts=store.legacyAccounts())
+                        store.write(initial)
+                        store.read()
+                    }.onSuccess { persisted->vault=persisted;exists=true }
+                        .onFailure { message("No se pudo guardar el perfil") }
                 },onBiometric=::biometric,onUpdate=::update,
                 onScan={ photo -> external=true;if(photo)pickQr.launch("image/*") else GmsBarcodeScanning.getClient(this).startScan()
                     .addOnSuccessListener { it.rawValue?.let(::receiveQr) }.addOnFailureListener { message("Escáner no disponible. Usa una imagen o la clave manual.") }
@@ -127,7 +131,15 @@ class NativeActivity : FragmentActivity() {
     override fun onStop(){super.onStop();if(!external){vault=null;scanned=null;stagedPhoto=null;window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)}}
     private fun message(value: String){Toast.makeText(this,value,Toast.LENGTH_LONG).show()}
     private fun applySettings(s: MobileVault){if(s.screenshots)window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) else window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)}
-    private fun update(s: MobileVault){runCatching { store.write(s) }.onSuccess { vault=s;applySettings(s) }.onFailure { message("No se pudieron guardar los cambios") }}
+    private fun update(s: MobileVault){
+        runCatching {
+            store.write(s)
+            store.read()
+        }.onSuccess { persisted->
+            vault=persisted
+            applySettings(persisted)
+        }.onFailure { message("No se pudieron guardar los cambios") }
+    }
     private fun work(success: String,action: suspend ()->Unit){
         busy=true;lifecycleScope.launch {
             try{withContext(Dispatchers.IO){action()};message(success)}catch(e:Exception){message("No se pudo completar. Verifica el archivo, la contraseña o la conexión.")}
