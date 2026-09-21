@@ -120,6 +120,14 @@ internal fun BackupPage(
             onPrimary = { action("export") },
             onSecondary = { action("restore") }
         )
+        OutlinedButton(
+            onClick = { action("restoreMerge") },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().height(43.dp),
+            shape = ControlShape
+        ) {
+            Text("Fusionar copia sin reemplazar tu bóveda")
+        }
 
         SectionHeader("Nube privada")
         BackupOptionCard(
