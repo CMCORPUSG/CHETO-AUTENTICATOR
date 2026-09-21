@@ -303,8 +303,16 @@ fun NativeApp(
             },onMessage=onMessage) }
             delete?.let { account->AlertDialog(onDismissRequest={delete=null},title={Text("Eliminar cuenta")},text={Text("¿Eliminar ${account.issuer} (${account.label})? Conserva una copia antes de eliminarla.")},confirmButton={TextButton(onClick={onUpdate(vault.copy(accounts=vault.accounts.filterNot { it.id==account.id }));delete=null}){Text("Eliminar")}},dismissButton={TextButton(onClick={delete=null}){Text("Cancelar")}}) }
             backupMode?.let { mode->PasswordDialog(
-                title=if(mode.contains("estore"))"Restaurar copia" else "Crear copia cifrada",
-                description=if(mode.contains("estore"))"Reemplazará las cuentas y el perfil actuales. Introduce la contraseña de la copia." else "Usa al menos 10 caracteres. Guarda esta contraseña: la necesitarás para recuperar tus cuentas.",
+                title=when(mode){
+                    "restoreMerge" -> "Fusionar copia"
+                    "restore","driveRestore" -> "Restaurar copia"
+                    else -> "Crear copia cifrada"
+                },
+                description=when(mode){
+                    "restoreMerge" -> "Agregará cuentas, categorías e identidades que no existan, sin borrar tu bóveda actual. Introduce la contraseña de la copia."
+                    "restore","driveRestore" -> "Reemplazará las cuentas y el perfil actuales. Introduce la contraseña de la copia."
+                    else -> "Usa al menos 10 caracteres. Guarda esta contraseña: la necesitarás para recuperar tus cuentas."
+                },
                 onDismiss={backupMode=null},onConfirm={p->if(p.isBlank()||(!mode.contains("estore")&&p.length<10))onMessage("Revisa la contraseña") else {backupMode=null;onBackup(mode,p)}}) }
             if(changePin)ChangePinDialog(
                 onDismiss={changePin=false},
