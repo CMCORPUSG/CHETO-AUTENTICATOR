@@ -155,8 +155,8 @@ internal fun SettingsPage(
                             onClick = {
                                 val apply = {
                                     onUpdate(vault.copy(lockTimeoutSeconds = seconds))
-                                    showAutoLock = false
                                 }
+                                showAutoLock = false
                                 if (seconds > vault.lockTimeoutSeconds) {
                                     onSensitiveAction("Aumentar tiempo de desbloqueo") { apply() }
                                 } else {
