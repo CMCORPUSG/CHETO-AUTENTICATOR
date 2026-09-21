@@ -48,7 +48,9 @@ internal fun SettingsPage(
     onUpdate: (MobileVault) -> Unit,
     onCategories: () -> Unit,
     onPin: () -> Unit,
-    onBiometricSetup: () -> Unit
+    onBiometricSetup: () -> Unit,
+    onSecurityCenter: () -> Unit,
+    onSensitiveAction: (String, () -> Unit) -> Unit
 ) {
     var showAutoLock by remember { mutableStateOf(false) }
     val autoLockLabel = when (vault.lockTimeoutSeconds) {
@@ -68,6 +70,13 @@ internal fun SettingsPage(
         }
 
         SettingsGroup("Seguridad") {
+            ActionRow(
+                Icons.Rounded.Security,
+                "Centro de seguridad",
+                "Estado de biometría, bloqueo, capturas y backup",
+                onSecurityCenter
+            )
+            GroupDivider()
             ToggleRow(
                 Icons.Rounded.Fingerprint,
                 "Biometría",
@@ -79,7 +88,13 @@ internal fun SettingsPage(
                 },
                 vault.biometric && biometricReady
             ) { enabled ->
-                if (enabled) onBiometricSetup() else onUpdate(vault.copy(biometric = false))
+                if (enabled) {
+                    onBiometricSetup()
+                } else {
+                    onSensitiveAction("Desactivar biometría") {
+                        onUpdate(vault.copy(biometric = false))
+                    }
+                }
             }
             if (!biometricReady) {
                 GroupDivider()
@@ -99,7 +114,15 @@ internal fun SettingsPage(
             GroupDivider()
             ToggleRow(Icons.Rounded.VisibilityOff, "Ocultar códigos", "Revelar cada TOTP al tocar", vault.hideCodes) { onUpdate(vault.copy(hideCodes = it)) }
             GroupDivider()
-            ToggleRow(Icons.Rounded.Screenshot, "Permitir capturas", "Desactiva la protección de pantalla", vault.screenshots) { onUpdate(vault.copy(screenshots = it)) }
+            ToggleRow(Icons.Rounded.Screenshot, "Permitir capturas", "Desactiva la protección de pantalla", vault.screenshots) { enabled ->
+                if (enabled) {
+                    onSensitiveAction("Permitir capturas") {
+                        onUpdate(vault.copy(screenshots = true))
+                    }
+                } else {
+                    onUpdate(vault.copy(screenshots = false))
+                }
+            }
         }
         SettingsGroup("Apariencia") {
             ToggleRow(Icons.Rounded.DarkMode, "Modo oscuro", "Tema oscuro en toda la app", vault.dark) { onUpdate(vault.copy(dark = it)) }
@@ -110,7 +133,7 @@ internal fun SettingsPage(
             ActionRow(Icons.Rounded.Category, "Categorías", "Organiza cuentas y colores", onCategories)
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("CHETO Authenticator 0.9.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("CHETO Authenticator 0.10.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Android nativo · Kotlin + Compose", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
@@ -130,8 +153,15 @@ internal fun SettingsPage(
                     ).forEach { (seconds, label) ->
                         TextButton(
                             onClick = {
-                                onUpdate(vault.copy(lockTimeoutSeconds = seconds))
-                                showAutoLock = false
+                                val apply = {
+                                    onUpdate(vault.copy(lockTimeoutSeconds = seconds))
+                                    showAutoLock = false
+                                }
+                                if (seconds > vault.lockTimeoutSeconds) {
+                                    onSensitiveAction("Aumentar tiempo de desbloqueo") { apply() }
+                                } else {
+                                    apply()
+                                }
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
