@@ -300,38 +300,240 @@ fun NativeApp(
     }
 }
 
-@Composable private fun Accounts(v:MobileVault,onCopy:(String)->Unit,onEdit:(MobileAccount)->Unit,onDelete:(MobileAccount)->Unit,onScan:(Boolean)->Unit,onCategories:()->Unit){
-    var search by remember { mutableStateOf("") };var category by remember { mutableStateOf("Todos") };var now by remember { mutableLongStateOf(System.currentTimeMillis()/1000) }
+@Composable private fun Accounts(
+    v:MobileVault,
+    onCopy:(String)->Unit,
+    onEdit:(MobileAccount)->Unit,
+    onDelete:(MobileAccount)->Unit,
+    onScan:(Boolean)->Unit,
+    onCategories:()->Unit
+){
+    var search by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("Todos") }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()/1000) }
     var revealed by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(Unit){while(true){now=System.currentTimeMillis()/1000;delay(1000)}}
     LaunchedEffect(revealed){if(revealed!=null){delay(10000);revealed=null}}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp,16.dp,16.dp,96.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item{Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Column(Modifier.padding(16.dp)){Text("Protege tus cuentas",fontWeight=FontWeight.Bold);Text("Guarda una copia cifrada desde Backup.",style=MaterialTheme.typography.bodySmall)}}}
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding=PaddingValues(16.dp,16.dp,16.dp,96.dp),
+        verticalArrangement=Arrangement.spacedBy(12.dp)
+    ){
+        item{
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement=Arrangement.spacedBy(10.dp)
+            ){
+                MetricCard(
+                    title="Cuentas",
+                    value=v.accounts.size.toString(),
+                    modifier=Modifier.weight(1f)
+                )
+                MetricCard(
+                    title="Categorías",
+                    value=v.categories.size.toString(),
+                    modifier=Modifier.weight(1f)
+                )
+            }
+        }
+
+        item{
+            Card(
+                colors=CardDefaults.cardColors(
+                    containerColor=MaterialTheme.colorScheme.primaryContainer
+                ),
+                shape=RoundedCornerShape(22.dp)
+            ){
+                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
+                    Text("Tu bóveda 2FA",fontWeight=FontWeight.Bold,fontSize=18.sp)
+                    Text(
+                        "Escanea un QR, importa desde una imagen o agrega la clave manualmente.",
+                        style=MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+
         item{Field("Buscar cuentas",search,{search=it})}
-        item{Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            (listOf("Todos")+v.categories).forEach { c->FilterChip(selected=c==category,onClick={category=c},label={Text(c)}) }
-            AssistChip(onClick=onCategories,label={Text("+ Categorías")})
-        }}
-        item{Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={onScan(false)},modifier=Modifier.weight(1f)){Text("Escanear QR")};OutlinedButton(onClick={onScan(true)},modifier=Modifier.weight(1f)){Text("QR de imagen")}}}
-        val accounts=v.accounts.filter { (category=="Todos"||it.category==category)&&(it.issuer+" "+it.label).contains(search,true) }
-        if(accounts.isEmpty())item{Panel("No hay cuentas","Toca + para agregar una clave o escanea el QR del servicio.")}
+
+        item{
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement=Arrangement.spacedBy(8.dp)
+            ){
+                (listOf("Todos")+v.categories).forEach { c->
+                    val color=categoryColor(c)
+                    FilterChip(
+                        selected=c==category,
+                        onClick={category=c},
+                        label={Text(c)},
+                        colors=FilterChipDefaults.filterChipColors(
+                            containerColor=color.copy(alpha=.10f),
+                            selectedContainerColor=color.copy(alpha=.24f)
+                        )
+                    )
+                }
+                AssistChip(onClick=onCategories,label={Text("+ Categorías")})
+            }
+        }
+
+        item{
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                FilledTonalButton(
+                    onClick={onScan(false)},
+                    modifier=Modifier.weight(1f)
+                ){
+                    Icon(Icons.Rounded.QrCodeScanner,contentDescription=null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Cámara")
+                }
+                FilledTonalButton(
+                    onClick={onScan(true)},
+                    modifier=Modifier.weight(1f)
+                ){
+                    Icon(Icons.Rounded.PhotoLibrary,contentDescription=null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Imagen")
+                }
+            }
+        }
+
+        val accounts=v.accounts.filter {
+            (category=="Todos"||it.category==category) &&
+                (it.issuer+" "+it.label).contains(search,true)
+        }
+
+        if(accounts.isEmpty())item{
+            Panel(
+                if(search.isBlank())"Aún no hay cuentas" else "Sin resultados",
+                if(search.isBlank())
+                    "Toca + para agregar una cuenta o usa el escáner QR."
+                else "Prueba otro nombre, correo o categoría."
+            )
+        }
+
         items(accounts,key={it.id}){a->
-            val code=remember(a,now/a.period){runCatching { TotpEngine.generate(a.secret,now,a.digits,a.period,a.algorithm) }.getOrDefault("------")}
+            val code=remember(a,now/a.period){
+                runCatching {
+                    TotpEngine.generate(a.secret,now,a.digits,a.period,a.algorithm)
+                }.getOrDefault("------")
+            }
             val seconds=TotpEngine.secondsRemaining(now,a.period)
-            Card(shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)){
-                Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                        Avatar(a.issuer,a.photo);Column(Modifier.weight(1f)){Text(a.issuer,fontWeight=FontWeight.Bold);Text(a.label,style=MaterialTheme.typography.bodySmall);Text(a.category,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)}
+            val accent=categoryColor(a.category)
+
+            Card(
+                shape=RoundedCornerShape(24.dp),
+                colors=CardDefaults.cardColors(
+                    containerColor=MaterialTheme.colorScheme.surface
+                ),
+                elevation=CardDefaults.cardElevation(defaultElevation=2.dp)
+            ){
+                Column(
+                    Modifier.padding(17.dp),
+                    verticalArrangement=Arrangement.spacedBy(12.dp)
+                ){
+                    Row(
+                        verticalAlignment=Alignment.CenterVertically,
+                        horizontalArrangement=Arrangement.spacedBy(12.dp)
+                    ){
+                        Avatar(a.issuer,a.photo)
+                        Column(Modifier.weight(1f)){
+                            Text(a.issuer,fontWeight=FontWeight.Bold,fontSize=17.sp)
+                            Text(a.label,style=MaterialTheme.typography.bodySmall)
+                            Surface(
+                                shape=RoundedCornerShape(50),
+                                color=accent.copy(alpha=.14f)
+                            ){
+                                Text(
+                                    a.category,
+                                    modifier=Modifier.padding(horizontal=9.dp,vertical=3.dp),
+                                    style=MaterialTheme.typography.labelSmall,
+                                    color=accent
+                                )
+                            }
+                        }
                     }
+
                     Row(verticalAlignment=Alignment.CenterVertically){
-                        Text(if(v.hideCodes&&revealed!=a.id)"••• •••" else code.chunked(if(a.digits==6)3 else 4).joinToString(" "),fontSize=30.sp,fontWeight=FontWeight.Black,modifier=Modifier.weight(1f).clickable { if(v.hideCodes)revealed=a.id else onCopy(code) })
-                        Box(contentAlignment=Alignment.Center){CircularProgressIndicator(progress={seconds.toFloat()/a.period},modifier=Modifier.size(42.dp),strokeWidth=4.dp);Text("${seconds}s",fontSize=11.sp)}
+                        Text(
+                            if(v.hideCodes&&revealed!=a.id)"••• •••"
+                            else code.chunked(if(a.digits==6)3 else 4).joinToString(" "),
+                            fontSize=31.sp,
+                            fontWeight=FontWeight.Black,
+                            letterSpacing=1.sp,
+                            modifier=Modifier.weight(1f).clickable {
+                                if(v.hideCodes)revealed=a.id else onCopy(code)
+                            }
+                        )
+                        Box(contentAlignment=Alignment.Center){
+                            CircularProgressIndicator(
+                                progress={seconds.toFloat()/a.period},
+                                modifier=Modifier.size(46.dp),
+                                strokeWidth=4.dp
+                            )
+                            Text("${seconds}s",fontSize=11.sp)
+                        }
                     }
-                    Row{TextButton(onClick={onCopy(code)}){Text("Copiar")};TextButton(onClick={onEdit(a)}){Text("Editar")};TextButton(onClick={onDelete(a)}){Text("Eliminar",color=MaterialTheme.colorScheme.error)}}
+
+                    Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                        TextButton(onClick={onCopy(code)}){
+                            Icon(Icons.Rounded.ContentCopy,contentDescription=null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Copiar")
+                        }
+                        TextButton(onClick={onEdit(a)}){
+                            Icon(Icons.Rounded.Edit,contentDescription=null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Editar")
+                        }
+                        TextButton(onClick={onDelete(a)}){
+                            Icon(
+                                Icons.Rounded.Delete,
+                                contentDescription=null,
+                                tint=MaterialTheme.colorScheme.error
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Eliminar",color=MaterialTheme.colorScheme.error)
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+@Composable private fun MetricCard(
+    title:String,
+    value:String,
+    modifier:Modifier=Modifier
+){
+    Card(
+        modifier=modifier,
+        shape=RoundedCornerShape(20.dp),
+        colors=CardDefaults.cardColors(
+            containerColor=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.55f)
+        )
+    ){
+        Column(Modifier.padding(16.dp)){
+            Text(value,fontSize=26.sp,fontWeight=FontWeight.Black)
+            Text(title,style=MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+private fun categoryColor(name:String):Color{
+    val palette=listOf(
+        Color(0xFF3157F6),
+        Color(0xFF7C4DFF),
+        Color(0xFF00897B),
+        Color(0xFFEF6C00),
+        Color(0xFFD81B60),
+        Color(0xFF546E7A)
+    )
+    val index=(name.hashCode() and Int.MAX_VALUE)%palette.size
+    return palette[index]
 }
 
 @Composable private fun AccountEditor(initial:MobileAccount,categories:List<String>,onPhoto:()->Unit,onDismiss:()->Unit,onSave:(MobileAccount)->Unit,onMessage:(String)->Unit){
