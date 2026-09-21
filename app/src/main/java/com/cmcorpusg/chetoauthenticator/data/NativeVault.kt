@@ -2,6 +2,7 @@ package com.cmcorpusg.chetoauthenticator.data
 
 import android.content.Context
 import android.util.Base64
+import com.cmcorpusg.chetoauthenticator.backup.BackupCrypto
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.security.DeviceCrypto
 import com.cmcorpusg.chetoauthenticator.security.PinSecurity
@@ -226,6 +227,12 @@ class NativeVault(context: Context) {
             }
         }
 
+        fun exportPortableJson(s: MobileVault): String =
+            encode(s).apply {
+                remove("pin")
+                remove("settings")
+            }.toString()
+
         fun export(s: MobileVault, password: String): String {
             require(password.length >= 10)
             val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
@@ -236,10 +243,7 @@ class NativeVault(context: Context) {
                 key(password, salt),
                 GCMParameterSpec(128, iv)
             )
-            val payload = encode(s).apply {
-                remove("pin")
-                remove("settings")
-            }.toString()
+            val payload = exportPortableJson(s)
             return JSONObject()
                 .put("v", 1)
                 .put("alg", "AES-256-GCM")
@@ -252,22 +256,23 @@ class NativeVault(context: Context) {
 
         fun restore(data: String, password: String, current: MobileVault): MobileVault {
             val obj = JSONObject(data)
-            require(
-                obj.getInt("v") == 1 &&
-                    obj.getInt("iterations") == 150000 &&
-                    obj.getString("alg") == "AES-256-GCM"
-            )
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(
-                Cipher.DECRYPT_MODE,
-                key(password, bytes(obj.getString("salt"))),
-                GCMParameterSpec(128, bytes(obj.getString("iv")))
-            )
-            val restored = decode(
-                JSONObject(
-                    cipher.doFinal(bytes(obj.getString("data"))).decodeToString()
+            val plain = if (obj.optString("format") == "CHETO-BACKUP") {
+                BackupCrypto.decryptWithPassword(data, password.toCharArray())
+            } else {
+                require(
+                    obj.getInt("v") == 1 &&
+                        obj.getInt("iterations") == 150000 &&
+                        obj.getString("alg") == "AES-256-GCM"
                 )
-            )
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(
+                    Cipher.DECRYPT_MODE,
+                    key(password, bytes(obj.getString("salt"))),
+                    GCMParameterSpec(128, bytes(obj.getString("iv")))
+                )
+                cipher.doFinal(bytes(obj.getString("data"))).decodeToString()
+            }
+            val restored = decode(JSONObject(plain))
             return current.copy(
                 name = restored.name,
                 emails = restored.emails,
