@@ -389,12 +389,14 @@ fun NativeApp(
             backupMode?.let { mode->PasswordDialog(
                 title=when{
                     mode.startsWith("exportSelected:") -> "Exportar selección"
+                    mode=="verify"||mode=="driveVerify" -> "Verificar copia"
                     mode=="restoreMerge"||mode=="driveRestoreMerge" -> "Fusionar copia"
                     mode=="restore"||mode=="driveRestore" -> "Restaurar copia"
                     else -> "Crear copia cifrada"
                 },
                 description=when{
                     mode.startsWith("exportSelected:") -> "Creará un archivo .cheto cifrado solo con las cuentas seleccionadas. Usa al menos 10 caracteres."
+                    mode=="verify"||mode=="driveVerify" -> "CHETO abrirá y validará la copia con esta contraseña, pero no cambiará ninguna cuenta de tu bóveda."
                     mode=="restoreMerge"||mode=="driveRestoreMerge" -> "Agregará cuentas, categorías e identidades que no existan, sin borrar tu bóveda actual. Introduce la contraseña de la copia."
                     mode=="restore"||mode=="driveRestore" -> "Reemplazará las cuentas y el perfil actuales. Introduce la contraseña de la copia."
                     else -> "Usa al menos 10 caracteres. Guarda esta contraseña: la necesitarás para recuperar tus cuentas."
