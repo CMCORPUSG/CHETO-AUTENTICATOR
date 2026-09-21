@@ -8,6 +8,7 @@ CHETO may store:
 
 - TOTP secrets and account labels.
 - Categories, colors and notes.
+- Accounts placed in the encrypted recycle bin until the user restores or permanently deletes them.
 - Local profile name, photo and email list.
 - Linked Google/Microsoft identity metadata.
 - Security preferences and backup status.
@@ -20,7 +21,9 @@ CHETO does not receive or store fingerprint templates or facial biometric templa
 
 ## TOTP operation
 
-TOTP generation is local and does not require internet access. CHETO must not transmit TOTP secrets or generated one-time codes to logo services, analytics providers or identity providers.
+TOTP generation is local and does not require internet access. CHETO can warn when automatic device time is disabled because inaccurate system time can make TOTP codes fail.
+
+Copied TOTP codes are marked as sensitive and are cleared from the clipboard after the configured timeout or when CHETO locks/leaves the foreground. CHETO must not transmit TOTP secrets or generated one-time codes to logo services, analytics providers or identity providers.
 
 ## Logos
 
