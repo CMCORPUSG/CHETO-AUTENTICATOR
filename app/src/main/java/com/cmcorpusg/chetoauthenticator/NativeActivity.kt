@@ -92,7 +92,7 @@ class NativeActivity : FragmentActivity() {
                 out.toByteArray()
             }
             val restored=NativeVault.restore(bytes.decodeToString(),password,current)
-            val result = if(pendingRestoreMode=="merge") mergeRestoredVault(current,restored) else restored
+            val result = if(pendingRestoreMode=="merge") VaultMergePolicy.merge(current,restored) else restored
             pendingRestoreMode="replace"
             store.write(result)
             withContext(Dispatchers.Main){if(vault!=null)vault=result}
@@ -448,31 +448,6 @@ class NativeActivity : FragmentActivity() {
             }
             .onFailure { message("No se pudo importar el QR de Google Authenticator") }
     }
-    private fun mergeRestoredVault(current:MobileVault,restored:MobileVault):MobileVault{
-        val mergedAccounts=current.accounts.toMutableList()
-        restored.accounts.forEach { candidate->
-            if(AccountPolicy.findDuplicate(candidate,mergedAccounts)==null){
-                mergedAccounts+=candidate
-            }
-        }
-        val mergedEmails=(current.emails+restored.emails)
-            .fold(mutableListOf<String>()){acc,email->
-                if(acc.none { it.equals(email,true) }) acc+=email
-                acc
-            }
-        val mergedIdentities=(current.linkedIdentities+restored.linkedIdentities)
-            .distinctBy { it.provider+":"+it.subject }
-        return current.copy(
-            name=current.name.ifBlank { restored.name },
-            photo=current.photo.ifBlank { restored.photo },
-            emails=mergedEmails,
-            categories=(current.categories+restored.categories).distinct(),
-            accounts=mergedAccounts,
-            categoryColors=restored.categoryColors+current.categoryColors,
-            linkedIdentities=mergedIdentities
-        )
-    }
-
     private fun copyCode(value:String){
         val clip=ClipData.newPlainText("Código 2FA",value)
         clip.description.extras=android.os.PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE",true) }
@@ -632,7 +607,7 @@ class NativeActivity : FragmentActivity() {
             "driveRestoreMerge"->drive { token -> work("Copia de Drive fusionada") {
                 val data=DriveBackupClient("cheto_native_backup_").downloadLatest(token)?:error("Sin copias")
                 val restored=NativeVault.restore(data,password,current)
-                val merged=mergeRestoredVault(current,restored)
+                val merged=VaultMergePolicy.merge(current,restored)
                 store.write(merged)
                 withContext(Dispatchers.Main){if(vault!=null)vault=merged}
             } }
