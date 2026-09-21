@@ -828,9 +828,12 @@ class NativeActivity : FragmentActivity() {
     }
 
     private fun disableBackup(){
-        BackupSettings(this).driveEnabled=false
-        BackupScheduler.disableGoogle(this)
-        message("Backup automático desactivado")
+        BackupSettings(this).apply {
+            driveEnabled=false
+            oneDriveEnabled=false
+        }
+        BackupScheduler.disable(this)
+        message("Backup automático de Google Drive y OneDrive desactivado")
     }
 
     private fun backup(mode:String,password:String){
