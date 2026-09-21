@@ -26,6 +26,9 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Sort
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -62,18 +65,27 @@ internal fun HomeScreen(
     onCopy: (String) -> Unit,
     onEdit: (MobileAccount) -> Unit,
     onDelete: (MobileAccount) -> Unit,
+    onToggleFavorite: (MobileAccount) -> Unit,
     onCategories: () -> Unit
 ) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Todos") }
+    var sortMode by remember { mutableStateOf("Favoritos") }
+    var favoritesOnly by remember { mutableStateOf(false) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis() / 1000) }
     var revealed by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { while (true) { now = System.currentTimeMillis() / 1000; delay(1000) } }
     LaunchedEffect(revealed) { if (revealed != null) { delay(10_000); revealed = null } }
 
-    val accounts = vault.accounts.filter {
+    val filtered = vault.accounts.filter {
         (category == "Todos" || it.category == category) &&
-            (it.issuer + " " + it.label).contains(search, true)
+            (!favoritesOnly || it.favorite) &&
+            (it.issuer + " " + it.label + " " + it.category + " " + it.notes).contains(search, true)
+    }
+    val accounts = when (sortMode) {
+        "A-Z" -> filtered.sortedWith(compareBy<MobileAccount> { it.issuer.lowercase() }.thenBy { it.label.lowercase() })
+        "Categoría" -> filtered.sortedWith(compareBy<MobileAccount> { it.category.lowercase() }.thenBy { it.issuer.lowercase() })
+        else -> filtered.sortedWith(compareByDescending<MobileAccount> { it.favorite }.thenBy { it.issuer.lowercase() }.thenBy { it.label.lowercase() })
     }
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -90,7 +102,7 @@ internal fun HomeScreen(
                     IconTile(Icons.Rounded.Shield, null, background = Color.White.copy(alpha = .58f))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("Bóveda protegida", style = MaterialTheme.typography.titleMedium)
-                        Text("${vault.accounts.size} cuentas · códigos offline", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${vault.accounts.size} cuentas · ${vault.accounts.count { it.favorite }} favoritas · códigos offline", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Surface(shape = RoundedCornerShape(50), color = ChetoSuccess.copy(alpha = .13f)) {
                         Text("Activa", Modifier.padding(horizontal = 9.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = ChetoSuccess)
@@ -105,7 +117,7 @@ internal fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
-                placeholder = { Text("Buscar cuenta o servicio") },
+                placeholder = { Text("Buscar servicio, cuenta, categoría o nota") },
                 shape = ControlShape
             )
         }
@@ -121,6 +133,35 @@ internal fun HomeScreen(
                     )
                 }
                 AssistChip(onClick = onCategories, label = { Text("Categorías") }, leadingIcon = { Icon(Icons.Rounded.Category, null, Modifier.size(17.dp)) })
+            }
+        }
+        item {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = favoritesOnly,
+                    onClick = { favoritesOnly = !favoritesOnly },
+                    label = { Text("Solo favoritas") },
+                    leadingIcon = { Icon(if (favoritesOnly) Icons.Rounded.Star else Icons.Rounded.StarBorder, null, Modifier.size(17.dp)) }
+                )
+                AssistChip(
+                    onClick = {
+                        sortMode = when (sortMode) {
+                            "Favoritos" -> "A-Z"
+                            "A-Z" -> "Categoría"
+                            else -> "Favoritos"
+                        }
+                    },
+                    label = { Text("Orden: $sortMode") },
+                    leadingIcon = { Icon(Icons.Rounded.Sort, null, Modifier.size(17.dp)) }
+                )
+                Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceVariant) {
+                    Text(
+                        "${accounts.size} visibles",
+                        Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
         if (accounts.isEmpty()) {
@@ -147,6 +188,7 @@ internal fun HomeScreen(
                 hidden = vault.hideCodes && revealed != account.id,
                 onCodeClick = { if (vault.hideCodes) revealed = account.id else onCopy(code) },
                 onCopy = { onCopy(code) },
+                onFavorite = { onToggleFavorite(account) },
                 onEdit = { onEdit(account) },
                 onDelete = { onDelete(account) }
             )
@@ -163,6 +205,7 @@ private fun TotpCard(
     hidden: Boolean,
     onCodeClick: () -> Unit,
     onCopy: () -> Unit,
+    onFavorite: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -173,6 +216,14 @@ private fun TotpCard(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(account.issuer, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                     Text(account.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+                IconButton(onClick = onFavorite, modifier = Modifier.size(37.dp)) {
+                    Icon(
+                        if (account.favorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                        if (account.favorite) "Quitar de favoritas" else "Marcar favorita",
+                        Modifier.size(20.dp),
+                        tint = if (account.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 Surface(shape = RoundedCornerShape(50), color = accent.copy(alpha = .12f)) {
                     Text(account.category, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = accent, maxLines = 1)
