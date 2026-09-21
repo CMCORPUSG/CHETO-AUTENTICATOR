@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ContentPasteOff
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Fingerprint
@@ -57,6 +58,7 @@ internal fun SettingsPage(
     onSensitiveAction: (String, () -> Unit) -> Unit
 ) {
     var showAutoLock by remember { mutableStateOf(false) }
+    var showClipboardTimeout by remember { mutableStateOf(false) }
     val autoLockLabel = when (vault.lockTimeoutSeconds) {
         0 -> "Inmediatamente"
         30 -> "Después de 30 segundos"
@@ -116,6 +118,13 @@ internal fun SettingsPage(
                 autoLockLabel
             ) { showAutoLock = true }
             GroupDivider()
+            ActionRow(
+                Icons.Rounded.ContentPasteOff,
+                "Limpiar portapapeles",
+                "Después de ${vault.clipboardClearSeconds} segundos",
+                { showClipboardTimeout = true }
+            )
+            GroupDivider()
             ToggleRow(Icons.Rounded.VisibilityOff, "Ocultar códigos", "Revelar cada TOTP al tocar", vault.hideCodes) { onUpdate(vault.copy(hideCodes = it)) }
             GroupDivider()
             ToggleRow(Icons.Rounded.Screenshot, "Permitir capturas", "Desactiva la protección de pantalla", vault.screenshots) { enabled ->
@@ -151,6 +160,45 @@ internal fun SettingsPage(
             Text("Android nativo · Kotlin + Compose", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
+    }
+
+
+    if (showClipboardTimeout) {
+        AlertDialog(
+            onDismissRequest = { showClipboardTimeout = false },
+            title = { Text("Limpiar portapapeles") },
+            text = {
+                Column {
+                    listOf(
+                        15 to "15 segundos",
+                        30 to "30 segundos",
+                        60 to "1 minuto",
+                        120 to "2 minutos"
+                    ).forEach { (seconds, label) ->
+                        TextButton(
+                            onClick = {
+                                showClipboardTimeout = false
+                                val apply = {
+                                    onUpdate(vault.copy(clipboardClearSeconds = seconds))
+                                }
+                                if (seconds > vault.clipboardClearSeconds) {
+                                    onSensitiveAction("Aumentar tiempo del portapapeles") { apply() }
+                                } else {
+                                    apply()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(label, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showClipboardTimeout = false }) { Text("Cancelar") }
+            }
+        )
     }
 
     if (showAutoLock) {
