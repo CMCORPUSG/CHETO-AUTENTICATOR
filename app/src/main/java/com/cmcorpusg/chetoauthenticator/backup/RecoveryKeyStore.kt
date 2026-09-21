@@ -9,9 +9,13 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
-class RecoveryKeyStore(context: Context) {
-    private val prefs = context.getSharedPreferences("cheto_recovery_key", Context.MODE_PRIVATE)
-    private val crypto = DeviceCrypto("cheto_recovery_wrap_v1")
+class RecoveryKeyStore(
+    context: Context,
+    slot: String = "default"
+) {
+    private val safeSlot = slot.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+    private val prefs = context.getSharedPreferences("cheto_recovery_key_$safeSlot", Context.MODE_PRIVATE)
+    private val crypto = DeviceCrypto("cheto_recovery_wrap_v1_$safeSlot")
 
     fun configure(password: CharArray) {
         require(password.size >= 10) { "Use at least 10 characters for the recovery password" }
