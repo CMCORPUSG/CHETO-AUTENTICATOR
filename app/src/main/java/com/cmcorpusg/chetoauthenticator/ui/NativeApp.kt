@@ -650,75 +650,348 @@ private fun categoryColor(name:String):Color{
     var autoEnabled by remember { mutableStateOf(settings.driveEnabled) }
     LaunchedEffect(busy){ autoEnabled=settings.driveEnabled }
     val last=if(settings.lastBackupEpochMillis>0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Aún no realizado"
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-        Panel("Copia de seguridad","Tus cuentas, categorías y perfil viajan cifrados con una contraseña de recuperación.")
-        Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
-            Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-                Text(if(autoEnabled)"Backup automático activo" else "Backup automático no configurado",fontWeight=FontWeight.Bold)
-                Text("Última copia: $last",style=MaterialTheme.typography.bodySmall)
-                Text(if(autoEnabled)"Programado aproximadamente cada 24 horas y después de cambios." else "Conecta Google Drive una vez para activar la programación.",style=MaterialTheme.typography.bodySmall)
-                settings.lastError?.takeIf { it.isNotBlank() }?.let { Text("Aviso: $it",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error) }
-            }
-        }
-        Button(onClick={action("export")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("Exportar archivo .cheto")}
-        OutlinedButton(onClick={action("restore")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("Restaurar desde archivo")}
-        HorizontalDivider();Text("Google Drive",style=MaterialTheme.typography.titleLarge)
-        Text("La copia se cifra antes de subirla a la carpeta privada appDataFolder de CHETO.",style=MaterialTheme.typography.bodyMedium)
-        OutlinedButton(onClick={action("drive")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text(if(autoEnabled)"Sincronizar y actualizar contraseña" else "Conectar Google Drive")}
-        OutlinedButton(onClick={action("driveRestore")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("Restaurar desde Google Drive")}
-        if(autoEnabled)OutlinedButton(
-            onClick={
-                settings.driveEnabled=false
-                BackupScheduler.disable(context)
-                autoEnabled=false
-            },
-            enabled=!busy,
-            modifier=Modifier.fillMaxWidth()
-        ){Text("Desactivar backup automático")}
-        Text("Conserva tu contraseña fuera del teléfono. Sin ella no se puede descifrar el respaldo.",style=MaterialTheme.typography.bodySmall)
-    }
-}
 
-@Composable private fun ProfileScreen(v:MobileVault,onUpdate:(MobileVault)->Unit,onPhoto:()->Unit,onMessage:(String)->Unit){
-    var name by remember(v.name) { mutableStateOf(v.name) };var email by remember { mutableStateOf("") }
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-        Row(verticalAlignment=Alignment.CenterVertically){Avatar(v.name,v.photo);TextButton(onClick=onPhoto){Text("Cambiar foto")}}
-        Field("Nombre",name,{name=it});Button(onClick={if(name.isNotBlank()){onUpdate(v.copy(name=name.trim()));onMessage("Perfil guardado")}}){Text("Guardar nombre")}
-        Text("Correos locales",style=MaterialTheme.typography.titleLarge)
-        Text("Son etiquetas de tu perfil; no inician sesión ni verifican la dirección.",style=MaterialTheme.typography.bodySmall)
-        v.emails.forEachIndexed { index,e->Card(Modifier.fillMaxWidth()){
-            Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                Avatar(EmailProvider.nameFor(e),EmailProvider.logoUrlFor(e).orEmpty())
-                Column(Modifier.weight(1f)){
-                    Text(e,fontWeight=FontWeight.Bold)
-                    Text(EmailProvider.nameFor(e),style=MaterialTheme.typography.bodySmall)
-                    if(index==0)Text("Principal",color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.labelMedium)
-                    Row{
-                        if(index!=0)TextButton(onClick={onUpdate(v.copy(emails=listOf(e)+(v.emails-e)))}){Text("Hacer principal")}
-                        TextButton(onClick={onUpdate(v.copy(emails=v.emails-e))}){Text("Eliminar")}
+    Column(
+        Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement=Arrangement.spacedBy(14.dp)
+    ){
+        Text("Respaldo y recuperación",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+        Text(
+            "CHETO cifra tus datos antes de guardarlos o subirlos.",
+            style=MaterialTheme.typography.bodyMedium,
+            color=MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Card(
+            Modifier.fillMaxWidth(),
+            shape=RoundedCornerShape(24.dp),
+            colors=CardDefaults.cardColors(
+                containerColor=if(autoEnabled)
+                    MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
+        ){
+            Row(
+                Modifier.padding(18.dp),
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(14.dp)
+            ){
+                Icon(
+                    if(autoEnabled)Icons.Rounded.CloudDone else Icons.Rounded.CloudOff,
+                    contentDescription=null,
+                    modifier=Modifier.size(34.dp),
+                    tint=if(autoEnabled)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)){
+                    Text(
+                        if(autoEnabled)"Backup automático activo" else "Backup automático no configurado",
+                        fontWeight=FontWeight.Bold
+                    )
+                    Text("Última copia: $last",style=MaterialTheme.typography.bodySmall)
+                    Text(
+                        if(autoEnabled)
+                            "Se programa aproximadamente cada 24 horas y tras cambios importantes."
+                        else
+                            "Conecta Google Drive una vez para habilitarlo.",
+                        style=MaterialTheme.typography.bodySmall
+                    )
+                    settings.lastError?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            "Aviso: $it",
+                            style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
-        }}
-        Field("Agregar correo",email,{email=it},keyboard=KeyboardType.Email)
-        Button(onClick={val e=email.trim();if(!android.util.Patterns.EMAIL_ADDRESS.matcher(e).matches()||v.emails.any { it.equals(e,true) })onMessage("Introduce un correo válido y no repetido")else{onUpdate(v.copy(emails=v.emails+e));email=""}}){Text("Agregar correo")}
+        }
+
+        Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp)){
+            Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                    Icon(Icons.Rounded.Backup,contentDescription=null,tint=MaterialTheme.colorScheme.primary)
+                    Text("Archivo .cheto",fontWeight=FontWeight.Bold,fontSize=17.sp)
+                }
+                Text(
+                    "Crea una copia cifrada para guardar en PC, USB o cualquier almacenamiento.",
+                    style=MaterialTheme.typography.bodySmall
+                )
+                Button(onClick={action("export")},enabled=!busy,modifier=Modifier.fillMaxWidth()){
+                    Text("Exportar copia cifrada")
+                }
+                OutlinedButton(onClick={action("restore")},enabled=!busy,modifier=Modifier.fillMaxWidth()){
+                    Text("Restaurar desde archivo")
+                }
+            }
+        }
+
+        Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp)){
+            Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                    Icon(Icons.Rounded.Cloud,contentDescription=null,tint=MaterialTheme.colorScheme.primary)
+                    Text("Google Drive",fontWeight=FontWeight.Bold,fontSize=17.sp)
+                }
+                Text(
+                    "La copia se cifra antes de subirla a la carpeta privada de CHETO en Drive.",
+                    style=MaterialTheme.typography.bodySmall
+                )
+                Button(onClick={action("drive")},enabled=!busy,modifier=Modifier.fillMaxWidth()){
+                    Text(if(autoEnabled)"Sincronizar ahora" else "Conectar Google Drive")
+                }
+                OutlinedButton(onClick={action("driveRestore")},enabled=!busy,modifier=Modifier.fillMaxWidth()){
+                    Text("Restaurar última copia de Drive")
+                }
+                if(autoEnabled)OutlinedButton(
+                    onClick={
+                        settings.driveEnabled=false
+                        BackupScheduler.disable(context)
+                        autoEnabled=false
+                    },
+                    enabled=!busy,
+                    modifier=Modifier.fillMaxWidth()
+                ){
+                    Text("Desactivar backup automático")
+                }
+            }
+        }
+
+        Text(
+            "Guarda tu contraseña de recuperación fuera del teléfono. Sin ella no se puede descifrar una copia.",
+            style=MaterialTheme.typography.bodySmall,
+            color=MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
-@Composable private fun SettingsScreen(v:MobileVault,onUpdate:(MobileVault)->Unit,onCategories:()->Unit,onPin:()->Unit){
-    Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        Panel("Seguridad local","La app se bloquea al salir. Tus datos se cifran con Android Keystore.")
-        Setting("Entrar con biometría",v.biometric){onUpdate(v.copy(biometric=it))}
-        Setting("Ocultar códigos",v.hideCodes){onUpdate(v.copy(hideCodes=it))}
-        Setting("Permitir capturas de pantalla",v.screenshots){onUpdate(v.copy(screenshots=it))}
-        Setting("Modo oscuro",v.dark){onUpdate(v.copy(dark=it))}
-        OutlinedButton(onClick=onPin,modifier=Modifier.fillMaxWidth()){Text("Cambiar PIN")}
-        OutlinedButton(onClick=onCategories,modifier=Modifier.fillMaxWidth()){Text("Gestionar categorías")}
-        Text("CHETO Authenticator 0.6.0\nAndroid nativo · Kotlin + Jetpack Compose",style=MaterialTheme.typography.bodySmall)
+@Composable private fun ProfileScreen(
+    v:MobileVault,
+    onUpdate:(MobileVault)->Unit,
+    onPhoto:()->Unit,
+    onMessage:(String)->Unit
+){
+    var name by remember(v.name) { mutableStateOf(v.name) }
+    var email by remember { mutableStateOf("") }
+
+    Column(
+        Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement=Arrangement.spacedBy(14.dp)
+    ){
+        Card(
+            Modifier.fillMaxWidth(),
+            shape=RoundedCornerShape(26.dp),
+            colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)
+        ){
+            Row(
+                Modifier.padding(18.dp),
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(14.dp)
+            ){
+                Avatar(v.name,v.photo)
+                Column(Modifier.weight(1f)){
+                    Text(v.name.ifBlank{"Perfil CHETO"},fontSize=20.sp,fontWeight=FontWeight.Bold)
+                    Text(
+                        v.emails.firstOrNull() ?: "Sin correo principal",
+                        style=MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        "${v.accounts.size} cuentas · ${v.categories.size} categorías",
+                        style=MaterialTheme.typography.labelMedium,
+                        color=MaterialTheme.colorScheme.primary
+                    )
+                }
+                TextButton(onClick=onPhoto){Text("Foto")}
+            }
+        }
+
+        Text("Datos del perfil",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+        Field("Nombre",name,{name=it})
+        Button(
+            onClick={
+                if(name.isBlank())onMessage("Escribe un nombre")
+                else{
+                    onUpdate(v.copy(name=name.trim()))
+                    onMessage("Perfil guardado")
+                }
+            },
+            modifier=Modifier.fillMaxWidth()
+        ){Text("Guardar nombre")}
+
+        Text("Correos",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+        Text(
+            "Por ahora se guardan como datos locales del perfil. La verificación con Google y Microsoft se agregará mediante OAuth.",
+            style=MaterialTheme.typography.bodySmall,
+            color=MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        v.emails.forEachIndexed { index,e->
+            Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){
+                Row(
+                    Modifier.padding(14.dp),
+                    verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(12.dp)
+                ){
+                    Avatar(EmailProvider.nameFor(e),EmailProvider.logoUrlFor(e).orEmpty())
+                    Column(Modifier.weight(1f)){
+                        Text(e,fontWeight=FontWeight.Bold)
+                        Text(EmailProvider.nameFor(e),style=MaterialTheme.typography.bodySmall)
+                        if(index==0){
+                            Surface(
+                                shape=RoundedCornerShape(50),
+                                color=MaterialTheme.colorScheme.primaryContainer
+                            ){
+                                Text(
+                                    "Principal",
+                                    modifier=Modifier.padding(horizontal=8.dp,vertical=3.dp),
+                                    style=MaterialTheme.typography.labelSmall,
+                                    color=MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Row{
+                            if(index!=0)TextButton(
+                                onClick={onUpdate(v.copy(emails=listOf(e)+(v.emails-e)))}
+                            ){Text("Hacer principal")}
+                            TextButton(
+                                onClick={onUpdate(v.copy(emails=v.emails-e))}
+                            ){Text("Eliminar")}
+                        }
+                    }
+                }
+            }
+        }
+
+        Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){
+            Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    Icon(Icons.Rounded.Email,contentDescription=null,tint=MaterialTheme.colorScheme.primary)
+                    Text("Agregar correo",fontWeight=FontWeight.Bold)
+                }
+                Field("correo@dominio.com",email,{email=it},keyboard=KeyboardType.Email)
+                Button(
+                    onClick={
+                        val e=email.trim()
+                        if(!android.util.Patterns.EMAIL_ADDRESS.matcher(e).matches()||v.emails.any { it.equals(e,true) }){
+                            onMessage("Introduce un correo válido y no repetido")
+                        }else{
+                            onUpdate(v.copy(emails=v.emails+e))
+                            email=""
+                        }
+                    },
+                    modifier=Modifier.fillMaxWidth()
+                ){Text("Agregar al perfil")}
+            }
+        }
     }
 }
 
-@Composable private fun Setting(label:String,value:Boolean,onChange:(Boolean)->Unit){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));Switch(checked=value,onCheckedChange=onChange)}}
+@Composable private fun SettingsScreen(
+    v:MobileVault,
+    onUpdate:(MobileVault)->Unit,
+    onCategories:()->Unit,
+    onPin:()->Unit
+){
+    Column(
+        Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement=Arrangement.spacedBy(14.dp)
+    ){
+        Text("Seguridad y preferencias",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+
+        Card(
+            Modifier.fillMaxWidth(),
+            shape=RoundedCornerShape(24.dp),
+            colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)
+        ){
+            Row(
+                Modifier.padding(18.dp),
+                verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(12.dp)
+            ){
+                Icon(Icons.Rounded.Security,contentDescription=null,modifier=Modifier.size(34.dp))
+                Column{
+                    Text("Bóveda local protegida",fontWeight=FontWeight.Bold)
+                    Text(
+                        "PIN + Android Keystore + bloqueo al salir",
+                        style=MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+
+        Text("Seguridad",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+        Setting(
+            Icons.Rounded.Fingerprint,
+            "Entrar con biometría",
+            "Usa huella o biometría fuerte cuando esté disponible.",
+            v.biometric
+        ){onUpdate(v.copy(biometric=it))}
+        Setting(
+            Icons.Rounded.VisibilityOff,
+            "Ocultar códigos",
+            "Los TOTP permanecen ocultos hasta que los reveles.",
+            v.hideCodes
+        ){onUpdate(v.copy(hideCodes=it))}
+        Setting(
+            Icons.Rounded.Screenshot,
+            "Permitir capturas",
+            "Desactivado protege la pantalla con FLAG_SECURE.",
+            v.screenshots
+        ){onUpdate(v.copy(screenshots=it))}
+
+        Text("Apariencia",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+        Setting(
+            Icons.Rounded.DarkMode,
+            "Modo oscuro",
+            "Cambia el tema completo de CHETO.",
+            v.dark
+        ){onUpdate(v.copy(dark=it))}
+
+        Text("Administración",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+        OutlinedButton(onClick=onPin,modifier=Modifier.fillMaxWidth()){
+            Icon(Icons.Rounded.Key,contentDescription=null)
+            Spacer(Modifier.width(8.dp))
+            Text("Cambiar PIN")
+        }
+        OutlinedButton(onClick=onCategories,modifier=Modifier.fillMaxWidth()){
+            Icon(Icons.Rounded.Category,contentDescription=null)
+            Spacer(Modifier.width(8.dp))
+            Text("Gestionar categorías")
+        }
+
+        Text(
+            "CHETO Authenticator 0.6.0\nAndroid nativo · Kotlin + Jetpack Compose",
+            style=MaterialTheme.typography.bodySmall,
+            color=MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable private fun Setting(
+    icon:ImageVector,
+    label:String,
+    description:String,
+    value:Boolean,
+    onChange:(Boolean)->Unit
+){
+    Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(18.dp)){
+        Row(
+            Modifier.padding(horizontal=14.dp,vertical=12.dp),
+            verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(12.dp)
+        ){
+            Icon(icon,contentDescription=null,tint=MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f)){
+                Text(label,fontWeight=FontWeight.SemiBold)
+                Text(
+                    description,
+                    style=MaterialTheme.typography.bodySmall,
+                    color=MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked=value,onCheckedChange=onChange)
+        }
+    }
+}
+
 @Composable private fun Panel(title:String,description:String){Card(Modifier.fillMaxWidth()){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(title,fontWeight=FontWeight.Bold);Text(description,style=MaterialTheme.typography.bodyMedium)}}}
 @Composable private fun Field(label:String,value:String,onChange:(String)->Unit,password:Boolean=false,keyboard:KeyboardType=KeyboardType.Text,singleLine:Boolean=true){
     OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},modifier=Modifier.fillMaxWidth(),singleLine=singleLine,
