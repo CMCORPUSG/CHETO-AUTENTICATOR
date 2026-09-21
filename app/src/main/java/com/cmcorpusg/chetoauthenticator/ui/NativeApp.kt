@@ -85,7 +85,10 @@ fun NativeApp(
     onLogin:(String)->Unit,onRegister:(String,String,String)->Unit,onBiometric:()->Unit,onBiometricSetup:()->Unit,
     onVerifyPin:(String)->Boolean,onVerifyBiometric:((()->Unit))->Unit,
     onChangePin:(String,String)->Unit,onUpdate:(MobileVault)->Unit,onScan:(Boolean)->Unit,onScannedConsumed:()->Unit,onCopy:(String)->Unit,
-    onBackup:(String,String)->Unit,onDisableBackup:()->Unit,onPhoto:(String?)->Unit,onPhotoConsumed:()->Unit,onLock:()->Unit,onMessage:(String)->Unit
+    onBackup:(String,String)->Unit,onDisableBackup:()->Unit,
+    googleIdentityConfigured:Boolean,microsoftIdentityConfigured:Boolean,
+    onLinkGoogle:()->Unit,onLinkMicrosoft:()->Unit,onUnlinkIdentity:(String,String)->Unit,
+    onPhoto:(String?)->Unit,onPhotoConsumed:()->Unit,onLock:()->Unit,onMessage:(String)->Unit
 ){
     ChetoTheme(dark=vault?.dark==true){
         Surface(Modifier.fillMaxSize()){
@@ -192,7 +195,22 @@ fun NativeApp(
                                     }
                                 }
                             )
-                            "Perfil"->UserProfileScreen(vault,onUpdate,{onPhoto(null)},onMessage)
+                            "Perfil"->UserProfileScreen(
+                                vault=vault,
+                                onUpdate=onUpdate,
+                                onPhoto={onPhoto(null)},
+                                googleConfigured=googleIdentityConfigured,
+                                microsoftConfigured=microsoftIdentityConfigured,
+                                onLinkGoogle=onLinkGoogle,
+                                onLinkMicrosoft=onLinkMicrosoft,
+                                onUnlinkIdentity={provider,subject->
+                                    critical=PendingCriticalAction(
+                                        "Desvincular identidad",
+                                        "Confirma tu identidad antes de desvincular una cuenta externa de CHETO."
+                                    ){onUnlinkIdentity(provider,subject)}
+                                },
+                                onMessage=onMessage
+                            )
                             "Ajustes"->SettingsPage(
                                 vault,
                                 biometricReady,
