@@ -63,7 +63,8 @@ internal fun SecurityCenterScreen(
         backup.driveEnabled,
         recoveryKeyConfigured,
         vault.clipboardClearSeconds <= 30,
-        automaticTime
+        automaticTime,
+        vault.hideCodes && vault.reauthOnReveal
     ).count { it }
 
     Column(
@@ -83,7 +84,7 @@ internal fun SecurityCenterScreen(
                     Column {
                         Text("Centro de seguridad", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            "$protectedCount de 8 protecciones recomendadas activas",
+                            "$protectedCount de 9 protecciones recomendadas activas",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -125,6 +126,12 @@ internal fun SecurityCenterScreen(
             "Códigos ocultos",
             if (vault.hideCodes) "Se revelan temporalmente al tocar" else "Visibles mientras la bóveda está abierta",
             vault.hideCodes
+        )
+        SecurityStatus(
+            Icons.Rounded.Lock,
+            "Confirmación para revelar",
+            if (vault.hideCodes && vault.reauthOnReveal) "PIN o biometría requeridos antes de mostrar un TOTP" else "Opcional · activa la confirmación en Ajustes",
+            vault.hideCodes && vault.reauthOnReveal
         )
         SecurityStatus(
             Icons.Rounded.ContentPasteOff,
