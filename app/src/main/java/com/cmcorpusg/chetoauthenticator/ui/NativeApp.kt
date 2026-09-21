@@ -196,6 +196,7 @@ fun NativeApp(
                                 {manageCategories=true}
                             )
                             "Backup"->BackupPage(
+                                vault=vault,
                                 busy=busy,
                                 action={ mode->
                                     critical=PendingCriticalAction(
