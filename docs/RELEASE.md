@@ -56,8 +56,13 @@ Before distribution verify:
 - Manual TOTP.
 - Clipboard clearing.
 - FLAG_SECURE / screenshots.
-- Local `.cheto` export and restore.
-- Google Drive backup and restore.
+- Local `.cheto` export, replace restore and non-destructive merge restore.
+- Selective encrypted export of chosen accounts.
+- Recycle bin restore and permanent deletion.
+- Forgot-PIN recovery from a valid encrypted `.cheto` backup.
+- Clipboard timeout and protected code reveal.
+- Automatic device time warning.
+- Google Drive backup, replace restore and merge restore.
 - Google identity linking.
 - Microsoft identity linking.
 - Restore on a second/clean device.
