@@ -11,7 +11,8 @@ import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 class ChetoAuthenticatorApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
-        if (BackupSettings(this).driveEnabled) {
+        val backup = BackupSettings(this)
+        if (backup.driveEnabled || backup.oneDriveEnabled) {
             BackupScheduler.schedule(this)
         }
     }
