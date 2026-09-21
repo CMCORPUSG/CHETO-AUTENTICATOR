@@ -179,8 +179,15 @@ class NativeActivity : FragmentActivity() {
             require(options.outWidth>0&&options.outHeight>0)
             options.inJustDecodeBounds=false;options.inSampleSize=(maxOf(options.outWidth,options.outHeight)/256).coerceAtLeast(1)
             val image=contentResolver.openInputStream(uri)!!.use { BitmapFactory.decodeStream(it,null,options) } ?: error("Imagen inválida")
-            val small=Bitmap.createScaledBitmap(image,256,256,true)
+            val side=minOf(image.width,image.height)
+            val x=((image.width-side)/2).coerceAtLeast(0)
+            val y=((image.height-side)/2).coerceAtLeast(0)
+            val square=Bitmap.createBitmap(image,x,y,side,side)
+            val small=Bitmap.createScaledBitmap(square,256,256,true)
+            if(square!==image) square.recycle()
+            if(small!==image) image.recycle()
             val data=ByteArrayOutputStream().apply { small.compress(Bitmap.CompressFormat.PNG,100,this) }.toByteArray()
+            small.recycle()
             val photo="data:image/png;base64,"+android.util.Base64.encodeToString(data,android.util.Base64.NO_WRAP)
             withContext(Dispatchers.Main) {
                 if(photoAccount==null)vault?.let { update(it.copy(photo=photo)) } else stagedPhoto=photo
@@ -217,6 +224,7 @@ class NativeActivity : FragmentActivity() {
                 microsoftIdentityConfigured=BuildConfig.MICROSOFT_CLIENT_ID.isNotBlank(),
                 onLinkGoogle=::linkGoogleIdentity,
                 onLinkMicrosoft=::linkMicrosoftIdentity,
+                onVerifyEmail=::verifyProfileEmail,
                 onUnlinkIdentity=::unlinkIdentity,
                 onScan={ photo -> external=true;if(photo)pickQr.launch("image/*") else GmsBarcodeScanning.getClient(this).startScan()
                     .addOnSuccessListener { it.rawValue?.let(::receiveQr) }.addOnFailureListener { message("Escáner no disponible. Usa una imagen o la clave manual.") }
@@ -366,6 +374,7 @@ class NativeActivity : FragmentActivity() {
                     latest.copy(
                         linkedIdentities=identities,
                         emails=emails,
+                        verifiedEmails=(latest.verifiedEmails+identity.email).distinctBy { it.lowercase() },
                         name=latest.name.ifBlank { identity.displayName },
                         photo=latest.photo.ifBlank { identity.photo }
                     )
@@ -410,6 +419,7 @@ class NativeActivity : FragmentActivity() {
                     latest.copy(
                         linkedIdentities=identities,
                         emails=emails,
+                        verifiedEmails=(latest.verifiedEmails+identity.email).distinctBy { it.lowercase() },
                         name=latest.name.ifBlank { identity.displayName }
                     )
                 )
@@ -421,6 +431,98 @@ class NativeActivity : FragmentActivity() {
             }finally{
                 external=false
             }
+        }
+    }
+
+    private fun verifyProfileEmail(email:String){
+        val normalized=email.trim().lowercase()
+        val current=vault ?: return
+        val domain=normalized.substringAfter('@',"")
+        when(domain){
+            "gmail.com","googlemail.com" -> {
+                if(BuildConfig.GOOGLE_WEB_CLIENT_ID.isBlank()){
+                    message("Google aún no está configurado. Cuando agreguemos el Client ID podrás verificar este Gmail.")
+                    return
+                }
+                external=true
+                lifecycleScope.launch {
+                    try{
+                        val result=GoogleIdentityClient(
+                            this@NativeActivity,
+                            BuildConfig.GOOGLE_WEB_CLIENT_ID
+                        ).signIn()
+                        if(!result.email.equals(normalized,true)){
+                            message("Seleccionaste ${result.email}. Para verificar, elige exactamente $normalized.")
+                            return@launch
+                        }
+                        val identity=LinkedIdentity(
+                            provider=result.provider,
+                            subject=result.subject,
+                            email=result.email,
+                            displayName=result.displayName,
+                            photo=result.photo
+                        )
+                        val latest=vault ?: current
+                        update(
+                            latest.copy(
+                                emails=(latest.emails+normalized).distinctBy { it.lowercase() },
+                                verifiedEmails=(latest.verifiedEmails+normalized).distinctBy { it.lowercase() },
+                                linkedIdentities=(latest.linkedIdentities.filterNot {
+                                    it.provider==identity.provider && it.subject==identity.subject
+                                }+identity)
+                            )
+                        )
+                        message("Correo Google verificado y agregado")
+                    }catch(_: GetCredentialCancellationException){
+                        message("Verificación Google cancelada")
+                    }catch(e:Exception){
+                        message(e.message ?: "No se pudo verificar el correo Google")
+                    }finally{
+                        external=false
+                    }
+                }
+            }
+            "outlook.com","hotmail.com","live.com","msn.com" -> {
+                if(BuildConfig.MICROSOFT_CLIENT_ID.isBlank()){
+                    message("Microsoft aún no está configurado. Cuando agreguemos el Client ID podrás verificar este correo.")
+                    return
+                }
+                external=true
+                lifecycleScope.launch {
+                    try{
+                        val result=MicrosoftIdentityClient(this@NativeActivity).signIn()
+                        if(!result.email.equals(normalized,true)){
+                            message("Seleccionaste ${result.email}. Para verificar, elige exactamente $normalized.")
+                            return@launch
+                        }
+                        val identity=LinkedIdentity(
+                            provider=result.provider,
+                            subject=result.subject,
+                            email=result.email,
+                            displayName=result.displayName,
+                            photo=result.photo
+                        )
+                        val latest=vault ?: current
+                        update(
+                            latest.copy(
+                                emails=(latest.emails+normalized).distinctBy { it.lowercase() },
+                                verifiedEmails=(latest.verifiedEmails+normalized).distinctBy { it.lowercase() },
+                                linkedIdentities=(latest.linkedIdentities.filterNot {
+                                    it.provider==identity.provider && it.subject==identity.subject
+                                }+identity)
+                            )
+                        )
+                        message("Correo Microsoft verificado y agregado")
+                    }catch(_: MicrosoftSignInCancelledException){
+                        message("Verificación Microsoft cancelada")
+                    }catch(e:Exception){
+                        message(e.message ?: "No se pudo verificar el correo Microsoft")
+                    }finally{
+                        external=false
+                    }
+                }
+            }
+            else -> message("Para este dominio falta configurar el servicio de código por correo. CHETO no agregará un correo sin verificar.")
         }
     }
 
@@ -471,9 +573,14 @@ class NativeActivity : FragmentActivity() {
                     algorithm=it.algorithm,
                     photo=ServiceCatalog.logoUrlFor(it.issuer).orEmpty()
                 )
-                val duplicate=AccountPolicy.findDuplicate(candidate,vault?.accounts.orEmpty())
-                if(duplicate!=null) message("Esta cuenta ya existe en CHETO")
-                else scanned=candidate
+                val current=vault ?: return@onSuccess
+                val duplicate=AccountPolicy.findDuplicate(candidate,current.accounts)
+                if(duplicate!=null) {
+                    message("Esta cuenta ya existe en CHETO")
+                } else {
+                    update(current.copy(accounts=current.accounts+candidate))
+                    message("Cuenta agregada automáticamente: ${candidate.issuer} · ${candidate.label}")
+                }
             }
             .onFailure { message("QR TOTP inválido") }
     }
