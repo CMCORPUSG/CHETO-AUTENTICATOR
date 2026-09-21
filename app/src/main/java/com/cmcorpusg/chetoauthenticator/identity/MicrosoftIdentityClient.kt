@@ -15,6 +15,34 @@ import kotlin.coroutines.resumeWithException
 class MicrosoftIdentityClient(
     private val activity: FragmentActivity
 ) {
+    suspend fun acquireOneDriveToken(): String {
+        val app = createApplication()
+        val scopes = arrayOf("Files.ReadWrite.AppFolder", "User.Read")
+        return suspendCancellableCoroutine { continuation ->
+            app.acquireToken(
+                activity,
+                scopes,
+                object : AuthenticationCallback {
+                    override fun onSuccess(authenticationResult: IAuthenticationResult) {
+                        if (continuation.isActive) {
+                            continuation.resume(authenticationResult.accessToken)
+                        }
+                    }
+
+                    override fun onError(exception: MsalException) {
+                        if (continuation.isActive) continuation.resumeWithException(exception)
+                    }
+
+                    override fun onCancel() {
+                        if (continuation.isActive) {
+                            continuation.resumeWithException(MicrosoftSignInCancelledException())
+                        }
+                    }
+                }
+            )
+        }
+    }
+
     suspend fun signIn(): IdentityAuthResult {
         val app = createApplication()
         return suspendCancellableCoroutine { continuation ->
