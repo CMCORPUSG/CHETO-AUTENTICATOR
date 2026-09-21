@@ -13,12 +13,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -30,9 +36,12 @@ import com.cmcorpusg.chetoauthenticator.data.TrashedAccount
 internal fun TrashScreen(
     vault: MobileVault,
     onRestore: (TrashedAccount) -> Unit,
+    onRestoreAll: () -> Unit,
     onDeleteForever: (TrashedAccount) -> Unit,
-    onEmptyTrash: () -> Unit
+    onEmptyTrash: () -> Unit,
+    onRetentionChange: (Int) -> Unit
 ) {
+    var showRetention by remember { mutableStateOf(false) }
     Column(
         Modifier
             .verticalScroll(rememberScrollState())
@@ -58,6 +67,15 @@ internal fun TrashScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                TextButton(onClick = { showRetention = true }) {
+                    Text(
+                        if (vault.trashRetentionDays == 0) {
+                            "Conservar hasta borrado manual"
+                        } else {
+                            "Borrado automático: ${vault.trashRetentionDays} días"
+                        }
+                    )
+                }
             }
         }
 
@@ -78,6 +96,15 @@ internal fun TrashScreen(
                 }
             }
         } else {
+            Button(
+                onClick = onRestoreAll,
+                modifier = Modifier.fillMaxWidth().height(44.dp),
+                shape = ControlShape
+            ) {
+                Icon(Icons.Rounded.Restore, contentDescription = null)
+                Text("  Restaurar todas las cuentas")
+            }
+
             vault.trash
                 .sortedByDescending { it.deletedAtEpochMillis }
                 .forEach { trashed ->
@@ -142,5 +169,36 @@ internal fun TrashScreen(
         }
 
         Spacer(Modifier.height(12.dp))
+    }
+
+    if (showRetention) {
+        AlertDialog(
+            onDismissRequest = { showRetention = false },
+            title = { Text("Retención de papelera") },
+            text = {
+                Column {
+                    listOf(
+                        7 to "7 días",
+                        30 to "30 días",
+                        90 to "90 días",
+                        0 to "Hasta borrado manual"
+                    ).forEach { (days, label) ->
+                        TextButton(
+                            onClick = {
+                                onRetentionChange(days)
+                                showRetention = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(label, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showRetention = false }) { Text("Cancelar") }
+            }
+        )
     }
 }
