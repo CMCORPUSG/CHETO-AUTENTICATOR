@@ -175,6 +175,15 @@ fun NativeApp(
                                         "Confirma tu identidad antes de eliminar una cuenta TOTP."
                                     ){delete=account}
                                 },
+                                { account->
+                                    onUpdate(
+                                        vault.copy(
+                                            accounts=vault.accounts.map {
+                                                if(it.id==account.id) it.copy(favorite=!it.favorite) else it
+                                            }
+                                        )
+                                    )
+                                },
                                 {manageCategories=true}
                             )
                             "Backup"->BackupPage(
