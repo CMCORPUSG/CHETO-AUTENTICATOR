@@ -62,6 +62,8 @@ fun NativeApp(
             var backupMode by remember { mutableStateOf<String?>(null) }
             var changePin by remember { mutableStateOf(false) }
             var manageCategories by remember { mutableStateOf(false) }
+            var clockMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+            LaunchedEffect(Unit){ while(true){ clockMillis=System.currentTimeMillis(); delay(30_000) } }
             LaunchedEffect(scanned){if(scanned!=null){editor=scanned;onScannedConsumed()}}
             LaunchedEffect(stagedPhoto){if(stagedPhoto!=null&&editor!=null){editor=editor!!.copy(photo=stagedPhoto);onPhotoConsumed()}}
             BackHandler { when { editor!=null->editor=null;manageCategories->manageCategories=false;page!="Inicio"->page="Inicio";else->onLock() } }
@@ -71,13 +73,29 @@ fun NativeApp(
                         Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){
                             Text("CHETO",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.Black)
                             Text(if(manageCategories)"Categorías" else page,color=Color.White.copy(alpha=.8f),fontSize=13.sp)
-                        };TextButton(onClick=onLock){Text("Bloquear",color=Color.White)}}
+                            Text("Lima · " + LimaClock.nowLabel(clockMillis),color=Color.White.copy(alpha=.72f),fontSize=11.sp)
+                        };TextButton(onClick=onLock){
+                            Icon(Icons.Rounded.Lock,contentDescription="Bloquear",tint=Color.White)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Bloquear",color=Color.White)
+                        }}
                     }
                 },bottomBar={if(!manageCategories)NavigationBar {
-                    listOf("Inicio" to "⌂","Backup" to "☁","Perfil" to "●","Ajustes" to "⚙").forEach { (name,icon)->
-                        NavigationBarItem(selected=page==name,onClick={page=name},icon={Text(icon,fontSize=22.sp)},label={Text(name)})
+                    val destinations=listOf(
+                        Triple("Inicio",Icons.Rounded.Home,"Inicio"),
+                        Triple("Backup",Icons.Rounded.Cloud,"Backup"),
+                        Triple("Perfil",Icons.Rounded.Person,"Perfil"),
+                        Triple("Ajustes",Icons.Rounded.Settings,"Ajustes")
+                    )
+                    destinations.forEach { (name,icon,label)->
+                        NavigationBarItem(
+                            selected=page==name,
+                            onClick={page=name},
+                            icon={Icon(icon,contentDescription=label)},
+                            label={Text(label)}
+                        )
                     }
-                }},floatingActionButton={if(page=="Inicio"&&!manageCategories)FloatingActionButton(onClick={editor=MobileAccount()},containerColor=Blue,contentColor=Color.White){Text("+",fontSize=30.sp)}}
+                }},floatingActionButton={if(page=="Inicio"&&!manageCategories)FloatingActionButton(onClick={editor=MobileAccount()},containerColor=Blue,contentColor=Color.White){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
             ){padding->
                 Column(Modifier.padding(padding).fillMaxSize()){
                     if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
