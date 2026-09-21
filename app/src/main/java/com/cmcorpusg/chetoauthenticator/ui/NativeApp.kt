@@ -30,12 +30,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.data.MobileAccount
 import com.cmcorpusg.chetoauthenticator.data.MobileVault
@@ -233,13 +235,24 @@ fun NativeApp(
 }
 
 @Composable private fun BackupScreen(busy:Boolean,action:(String)->Unit){
+    val context=LocalContext.current
+    val settings=BackupSettings(context)
+    val last=if(settings.lastBackupEpochMillis>0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Aún no realizado"
     Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
         Panel("Copia de seguridad","Tus cuentas, categorías y perfil viajan cifrados con una contraseña de recuperación.")
+        Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
+            Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                Text(if(settings.driveEnabled)"Backup automático activo" else "Backup automático no configurado",fontWeight=FontWeight.Bold)
+                Text("Última copia: $last",style=MaterialTheme.typography.bodySmall)
+                Text(if(settings.driveEnabled)"Programado aproximadamente cada 24 horas y después de cambios." else "Conecta Google Drive una vez para activar la programación.",style=MaterialTheme.typography.bodySmall)
+                settings.lastError?.takeIf { it.isNotBlank() }?.let { Text("Aviso: $it",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error) }
+            }
+        }
         Button(onClick={action("export")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("Exportar archivo .cheto")}
         OutlinedButton(onClick={action("restore")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("Restaurar desde archivo")}
         HorizontalDivider();Text("Google Drive",style=MaterialTheme.typography.titleLarge)
-        Text("Copia manual cifrada en la carpeta privada de la app. Requiere configurar OAuth Android para este APK.",style=MaterialTheme.typography.bodyMedium)
-        OutlinedButton(onClick={action("drive")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("Guardar en Google Drive")}
+        Text("La copia se cifra antes de subirla a la carpeta privada appDataFolder de CHETO.",style=MaterialTheme.typography.bodyMedium)
+        OutlinedButton(onClick={action("drive")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text(if(settings.driveEnabled)"Sincronizar y actualizar contraseña" else "Conectar Google Drive")}
         OutlinedButton(onClick={action("driveRestore")},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text("Restaurar desde Google Drive")}
         Text("Conserva tu contraseña fuera del teléfono. Sin ella no se puede descifrar el respaldo.",style=MaterialTheme.typography.bodySmall)
     }
