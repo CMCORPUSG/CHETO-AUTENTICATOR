@@ -24,6 +24,7 @@ import com.cmcorpusg.chetoauthenticator.backup.DriveBackupClient
 import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 import com.cmcorpusg.chetoauthenticator.backup.BackupScheduler
+import com.cmcorpusg.chetoauthenticator.core.GoogleAuthMigrationParser
 import com.cmcorpusg.chetoauthenticator.core.OtpAuthParser
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.data.*
@@ -95,8 +96,12 @@ class NativeActivity : FragmentActivity() {
             val reader=BarcodeScanning.getClient()
             runCatching { InputImage.fromFilePath(this,uri) }.onSuccess { image ->
                 reader.process(image).addOnSuccessListener { codes ->
-                    val raw=codes.firstOrNull { it.rawValue?.startsWith("otpauth://")==true }?.rawValue
-                    if(raw==null)message("No se encontró un QR TOTP") else receiveQr(raw)
+                    val raw=codes.firstOrNull {
+                        it.rawValue?.let { value ->
+                            value.startsWith("otpauth://") || value.startsWith("otpauth-migration://")
+                        } == true
+                    }?.rawValue
+                    if(raw==null)message("No se encontró un QR TOTP compatible") else receiveQr(raw)
                 }.addOnFailureListener { message("No se pudo leer la imagen") }.addOnCompleteListener { reader.close() }
             }.onFailure { reader.close();message("Imagen inválida") }
         }
@@ -264,6 +269,10 @@ class NativeActivity : FragmentActivity() {
     }
     private fun receiveQr(raw:String){
         if(vault==null)return
+        if(raw.startsWith("otpauth-migration://")){
+            receiveMigration(raw)
+            return
+        }
         runCatching { OtpAuthParser.parse(raw).also { TotpEngine.generate(it.secret,digits=it.digits,period=it.period,algorithm=it.algorithm) } }
             .onSuccess {
                 val candidate=MobileAccount(
@@ -280,6 +289,49 @@ class NativeActivity : FragmentActivity() {
                 else scanned=candidate
             }
             .onFailure { message("QR TOTP inválido") }
+    }
+
+    private fun receiveMigration(raw:String){
+        val current=vault ?: return
+        runCatching { GoogleAuthMigrationParser.parse(raw) }
+            .onSuccess { payload ->
+                val accepted=mutableListOf<MobileAccount>()
+                var duplicates=0
+                payload.entries.forEach { entry ->
+                    val candidate=MobileAccount(
+                        issuer=entry.issuer,
+                        label=entry.label,
+                        secret=entry.secret,
+                        digits=entry.digits,
+                        period=30,
+                        algorithm=entry.algorithm,
+                        photo=ServiceCatalog.logoUrlFor(entry.issuer).orEmpty()
+                    )
+                    val existing=current.accounts+accepted
+                    if(AccountPolicy.findDuplicate(candidate,existing)!=null){
+                        duplicates++
+                    }else{
+                        runCatching {
+                            TotpEngine.generate(
+                                candidate.secret,
+                                digits=candidate.digits,
+                                period=candidate.period,
+                                algorithm=candidate.algorithm
+                            )
+                        }.onSuccess { accepted+=candidate }
+                    }
+                }
+                if(accepted.isNotEmpty()){
+                    update(current.copy(accounts=current.accounts+accepted))
+                }
+                val parts=mutableListOf<String>()
+                parts += "${accepted.size} cuenta(s) importada(s)"
+                if(duplicates>0) parts += "$duplicates duplicada(s) omitida(s)"
+                if(payload.skippedUnsupported>0) parts += "${payload.skippedUnsupported} no compatible(s)"
+                if(payload.batchSize>1) parts += "QR ${payload.batchIndex+1} de ${payload.batchSize}"
+                message(parts.joinToString(" · "))
+            }
+            .onFailure { message("No se pudo importar el QR de Google Authenticator") }
     }
     private fun copyCode(value:String){
         val clip=ClipData.newPlainText("Código 2FA",value)
