@@ -9,7 +9,9 @@ object SelectiveExportPolicy {
 
         return source.copy(
             name = "",
+            username = "",
             emails = emptyList(),
+            verifiedEmails = emptyList(),
             photo = "",
             categories = usedCategories,
             accounts = selected,
