@@ -16,35 +16,54 @@ data class DriveBackupInfo(
 
 class DriveBackupClient(private val prefix: String = "cheto_backup_") {
     fun upload(accessToken: String, encryptedPayload: String) {
-        val boundary = "cheto-${UUID.randomUUID()}"
-        val metadata = JSONObject()
-            .put("name", "${prefix}${System.currentTimeMillis()}.enc")
-            .put("parents", org.json.JSONArray().put("appDataFolder"))
-            .toString()
+        val existing = listBackups(accessToken, 100)
+            .firstOrNull { it.name == FIXED_BACKUP_NAME }
 
-        val url = URL("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            doOutput = true
-            connectTimeout = 20_000
-            readTimeout = 30_000
-            setRequestProperty("Authorization", "Bearer $accessToken")
-            setRequestProperty("Content-Type", "multipart/related; boundary=$boundary")
+        if (existing != null) {
+            val connection = open(
+                "https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media",
+                accessToken,
+                "PATCH"
+            ).apply {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/octet-stream")
+            }
+            connection.outputStream.use { it.write(encryptedPayload.toByteArray(Charsets.UTF_8)) }
+            ensureSuccess(connection)
+            connection.disconnect()
+        } else {
+            val boundary = "cheto-${UUID.randomUUID()}"
+            val metadata = JSONObject()
+                .put("name", FIXED_BACKUP_NAME)
+                .put("parents", org.json.JSONArray().put("appDataFolder"))
+                .toString()
+
+            val url = URL("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")
+            val connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                connectTimeout = 20_000
+                readTimeout = 30_000
+                setRequestProperty("Authorization", "Bearer $accessToken")
+                setRequestProperty("Content-Type", "multipart/related; boundary=$boundary")
+            }
+
+            connection.outputStream.buffered().use { out ->
+                fun write(text: String) = out.write(text.encodeToByteArray())
+                write("--$boundary\r\n")
+                write("Content-Type: application/json; charset=UTF-8\r\n\r\n")
+                write(metadata)
+                write("\r\n--$boundary\r\n")
+                write("Content-Type: application/octet-stream\r\n\r\n")
+                write(encryptedPayload)
+                write("\r\n--$boundary--\r\n")
+            }
+
+            ensureSuccess(connection)
+            connection.disconnect()
         }
 
-        connection.outputStream.buffered().use { out ->
-            fun write(text: String) = out.write(text.encodeToByteArray())
-            write("--$boundary\r\n")
-            write("Content-Type: application/json; charset=UTF-8\r\n\r\n")
-            write(metadata)
-            write("\r\n--$boundary\r\n")
-            write("Content-Type: application/octet-stream\r\n\r\n")
-            write(encryptedPayload)
-            write("\r\n--$boundary--\r\n")
-        }
-
-        ensureSuccess(connection)
-        trimOldBackups(accessToken)
+        removeLegacyDuplicates(accessToken)
     }
 
     fun downloadLatest(accessToken: String): String? {
@@ -80,9 +99,9 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
         }
     }
 
-    private fun trimOldBackups(accessToken: String) {
+    private fun removeLegacyDuplicates(accessToken: String) {
         val files = listBackups(accessToken, 100)
-        files.drop(MAX_BACKUPS).forEach { backup ->
+        files.filter { it.name != FIXED_BACKUP_NAME }.forEach { backup ->
             val connection = open(
                 "https://www.googleapis.com/drive/v3/files/${backup.id}",
                 accessToken,
@@ -145,5 +164,6 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
 
     companion object {
         private const val MAX_BACKUPS = 7
+        private const val FIXED_BACKUP_NAME = "CHETO-BACKUP.cheto"
     }
 }
