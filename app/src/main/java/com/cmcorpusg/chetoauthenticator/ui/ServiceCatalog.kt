@@ -1,6 +1,12 @@
 package com.cmcorpusg.chetoauthenticator.ui
 
 object ServiceCatalog {
+    val suggestions = listOf(
+        "Google","Microsoft","GitHub","OpenAI","Twitch","Kick",
+        "Discord","Amazon","PayPal","Instagram","Facebook","Dropbox",
+        "YouTube","Binance","Steam","Apple"
+    )
+
     private val domains = linkedMapOf(
         "google" to "google.com",
         "gmail" to "gmail.com",
