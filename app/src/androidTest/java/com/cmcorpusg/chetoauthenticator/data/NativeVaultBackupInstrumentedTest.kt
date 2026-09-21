@@ -41,6 +41,18 @@ class NativeVaultBackupInstrumentedTest {
                     photo = "https://example.com/google.png",
                     linkedAtEpochMillis = 123456789L
                 )
+            ),
+            trash = listOf(
+                TrashedAccount(
+                    account = MobileAccount(
+                        id = "trash-1",
+                        issuer = "Discord",
+                        label = "old@example.com",
+                        secret = "JBSWY3DPEHPK3PXQ",
+                        category = "Social"
+                    ),
+                    deletedAtEpochMillis = 987654321L
+                )
             )
         )
 
@@ -50,7 +62,8 @@ class NativeVaultBackupInstrumentedTest {
             hideCodes = true,
             biometric = true,
             screenshots = false,
-            lockTimeoutSeconds = 60
+            lockTimeoutSeconds = 60,
+            clipboardClearSeconds = 15
         )
 
         val encrypted = NativeVault.export(source, password)
@@ -63,6 +76,7 @@ class NativeVaultBackupInstrumentedTest {
         assertEquals(source.accounts, restored.accounts)
         assertEquals(source.categoryColors, restored.categoryColors)
         assertEquals(source.linkedIdentities, restored.linkedIdentities)
+        assertEquals(source.trash, restored.trash)
 
         // Portable backups intentionally do not replace device-local security settings.
         assertEquals(localDevice.pin, restored.pin)
@@ -71,6 +85,7 @@ class NativeVaultBackupInstrumentedTest {
         assertEquals(localDevice.biometric, restored.biometric)
         assertEquals(localDevice.screenshots, restored.screenshots)
         assertEquals(localDevice.lockTimeoutSeconds, restored.lockTimeoutSeconds)
+        assertEquals(localDevice.clipboardClearSeconds, restored.clipboardClearSeconds)
     }
 
     @Test
