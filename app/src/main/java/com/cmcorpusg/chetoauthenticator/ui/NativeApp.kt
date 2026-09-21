@@ -375,7 +375,7 @@ fun NativeApp(
                 horizontalArrangement=Arrangement.spacedBy(8.dp)
             ){
                 (listOf("Todos")+v.categories).forEach { c->
-                    val color=categoryColor(c)
+                    val color=categoryColor(c,v.categoryColors)
                     FilterChip(
                         selected=c==category,
                         onClick={category=c},
@@ -432,7 +432,7 @@ fun NativeApp(
                 }.getOrDefault("------")
             }
             val seconds=TotpEngine.secondsRemaining(now,a.period)
-            val accent=categoryColor(a.category)
+            val accent=categoryColor(a.category,v.categoryColors)
 
             Card(
                 shape=RoundedCornerShape(24.dp),
@@ -534,18 +534,23 @@ fun NativeApp(
     }
 }
 
-private fun categoryColor(name:String):Color{
-    val palette=listOf(
-        Color(0xFF3157F6),
-        Color(0xFF7C4DFF),
-        Color(0xFF00897B),
-        Color(0xFFEF6C00),
-        Color(0xFFD81B60),
-        Color(0xFF546E7A)
-    )
-    val index=(name.hashCode() and Int.MAX_VALUE)%palette.size
-    return palette[index]
+private val categoryPalette=linkedMapOf(
+    "#3157F6" to Color(0xFF3157F6),
+    "#7C4DFF" to Color(0xFF7C4DFF),
+    "#00897B" to Color(0xFF00897B),
+    "#EF6C00" to Color(0xFFEF6C00),
+    "#D81B60" to Color(0xFFD81B60),
+    "#546E7A" to Color(0xFF546E7A)
+)
+
+private fun categoryColorHex(name:String,overrides:Map<String,String>):String{
+    overrides[name]?.let { if(categoryPalette.containsKey(it.uppercase()))return it.uppercase() }
+    val keys=categoryPalette.keys.toList()
+    return keys[(name.hashCode() and Int.MAX_VALUE)%keys.size]
 }
+
+private fun categoryColor(name:String,overrides:Map<String,String>):Color =
+    categoryPalette[categoryColorHex(name,overrides)] ?: Blue
 
 @Composable private fun AccountEditor(initial:MobileAccount,categories:List<String>,onPhoto:()->Unit,onDismiss:()->Unit,onSave:(MobileAccount)->Unit,onMessage:(String)->Unit){
     var a by remember(initial.id) { mutableStateOf(initial) }
@@ -628,19 +633,131 @@ private fun categoryColor(name:String):Color{
     }
 }
 
-@Composable private fun Categories(v:MobileVault,onUpdate:(MobileVault)->Unit,onBack:()->Unit,onMessage:(String)->Unit){
-    var text by remember { mutableStateOf("") };var editing by remember { mutableStateOf<String?>(null) }
-    Column(Modifier.padding(20.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
-        TextButton(onClick=onBack){Text("‹ Volver")};Text("Organiza tus cuentas",style=MaterialTheme.typography.titleLarge)
-        Field(if(editing==null)"Nueva categoría" else "Renombrar categoría",text,{text=it})
-        Button(onClick={val name=text.trim();val old=editing
-            if(name.isBlank()||v.categories.any { it.equals(name,true)&&it!=old })onMessage("Elige un nombre único")
-            else{onUpdate(v.copy(categories=if(old==null)v.categories+name else v.categories.map { if(it==old)name else it },accounts=v.accounts.map { if(it.category==old)it.copy(category=name) else it }));editing=null;text=""}
-        }){Text(if(editing==null)"Crear categoría" else "Guardar nombre")}
-        v.categories.forEach { c->Card(Modifier.fillMaxWidth()){Column(Modifier.padding(14.dp)){
-            Text("$c · ${v.accounts.count { it.category==c }}",fontWeight=FontWeight.Bold)
-            if(c!="Sin categoría")Row{TextButton(onClick={editing=c;text=c}){Text("Editar")};TextButton(onClick={onUpdate(v.copy(categories=v.categories-c,accounts=v.accounts.map { if(it.category==c)it.copy(category="Sin categoría") else it }));if(editing==c){editing=null;text=""}}){Text("Eliminar")}}
-        }}}
+@Composable private fun Categories(
+    v:MobileVault,
+    onUpdate:(MobileVault)->Unit,
+    onBack:()->Unit,
+    onMessage:(String)->Unit
+){
+    var text by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf<String?>(null) }
+    var selectedHex by remember { mutableStateOf(categoryPalette.keys.first()) }
+
+    Column(
+        Modifier.padding(20.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement=Arrangement.spacedBy(12.dp)
+    ){
+        TextButton(onClick=onBack){Text("‹ Volver")}
+        Text("Categorías",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+        Text(
+            "Organiza tus cuentas y asigna un color visual a cada grupo.",
+            style=MaterialTheme.typography.bodySmall,
+            color=MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp)){
+            Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+                Field(
+                    if(editing==null)"Nueva categoría" else "Renombrar categoría",
+                    text,
+                    {text=it}
+                )
+                Text("Color",fontWeight=FontWeight.SemiBold)
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement=Arrangement.spacedBy(10.dp)
+                ){
+                    categoryPalette.forEach { (hex,color)->
+                        Box(
+                            Modifier.size(38.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .clickable { selectedHex=hex },
+                            contentAlignment=Alignment.Center
+                        ){
+                            if(selectedHex==hex){
+                                Text("✓",color=Color.White,fontWeight=FontWeight.Black)
+                            }
+                        }
+                    }
+                }
+                Button(
+                    onClick={
+                        val name=text.trim()
+                        val old=editing
+                        if(name.isBlank()||v.categories.any { it.equals(name,true)&&it!=old }){
+                            onMessage("Elige un nombre único")
+                        }else{
+                            val newCategories=if(old==null){
+                                v.categories+name
+                            }else{
+                                v.categories.map { if(it==old)name else it }
+                            }
+                            val newAccounts=v.accounts.map {
+                                if(it.category==old)it.copy(category=name) else it
+                            }
+                            val newColors=v.categoryColors.toMutableMap().apply {
+                                if(old!=null&&old!=name)remove(old)
+                                put(name,selectedHex)
+                            }
+                            onUpdate(v.copy(
+                                categories=newCategories,
+                                accounts=newAccounts,
+                                categoryColors=newColors
+                            ))
+                            editing=null
+                            text=""
+                            selectedHex=categoryPalette.keys.first()
+                        }
+                    },
+                    modifier=Modifier.fillMaxWidth()
+                ){
+                    Text(if(editing==null)"Crear categoría" else "Guardar categoría")
+                }
+            }
+        }
+
+        v.categories.forEach { cat->
+            val accent=categoryColor(cat,v.categoryColors)
+            Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp)){
+                Row(
+                    Modifier.padding(14.dp),
+                    verticalAlignment=Alignment.CenterVertically,
+                    horizontalArrangement=Arrangement.spacedBy(12.dp)
+                ){
+                    Box(Modifier.size(14.dp).clip(CircleShape).background(accent))
+                    Column(Modifier.weight(1f)){
+                        Text(cat,fontWeight=FontWeight.Bold)
+                        Text(
+                            "${v.accounts.count { it.category==cat }} cuentas",
+                            style=MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    if(cat!="Sin categoría"){
+                        TextButton(onClick={
+                            editing=cat
+                            text=cat
+                            selectedHex=categoryColorHex(cat,v.categoryColors)
+                        }){Text("Editar")}
+                        TextButton(onClick={
+                            val colors=v.categoryColors.toMutableMap().apply { remove(cat) }
+                            onUpdate(v.copy(
+                                categories=v.categories-cat,
+                                accounts=v.accounts.map {
+                                    if(it.category==cat)it.copy(category="Sin categoría") else it
+                                },
+                                categoryColors=colors
+                            ))
+                            if(editing==cat){
+                                editing=null
+                                text=""
+                                selectedHex=categoryPalette.keys.first()
+                            }
+                        }){Text("Eliminar",color=MaterialTheme.colorScheme.error)}
+                    }
+                }
+            }
+        }
     }
 }
 
