@@ -57,7 +57,9 @@ data class MobileVault(
     val trash: List<TrashedAccount> = emptyList(),
     val clipboardClearSeconds: Int = 30,
     val reauthOnReveal: Boolean = false,
-    val trashRetentionDays: Int = 30
+    val trashRetentionDays: Int = 30,
+    val username: String = "",
+    val verifiedEmails: List<String> = emptyList()
 )
 
 class NativeVault(context: Context) {
@@ -181,17 +183,24 @@ class NativeVault(context: Context) {
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
-        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 11).put("pin", s.pin)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 12).put("pin", s.pin)
             .put(
                 "profile",
                 JSONObject()
                     .put("name", s.name)
+                    .put("username", s.username)
                     .put("photo", s.photo)
                     .put("primaryEmail", s.emails.firstOrNull().orEmpty())
                     .put(
                         "emails",
                         JSONArray().apply {
                             s.emails.forEach { put(JSONObject().put("email", it)) }
+                        }
+                    )
+                    .put(
+                        "verifiedEmails",
+                        JSONArray().apply {
+                            s.verifiedEmails.distinctBy { it.lowercase() }.forEach { put(it) }
                         }
                     )
                     .put(
@@ -297,6 +306,7 @@ class NativeVault(context: Context) {
 
             val emails = p.optJSONArray("emails") ?: JSONArray()
             val identitiesArray = p.optJSONArray("linkedIdentities") ?: JSONArray()
+            val verifiedArray = p.optJSONArray("verifiedEmails") ?: JSONArray()
             val linkedIdentities = (0 until identitiesArray.length()).mapNotNull { index ->
                 val item = identitiesArray.optJSONObject(index) ?: return@mapNotNull null
                 val provider = item.optString("provider").trim().lowercase()
@@ -315,6 +325,11 @@ class NativeVault(context: Context) {
                     )
                 }
             }.distinctBy { it.provider + ":" + it.subject }
+            val verifiedEmails = (
+                (0 until verifiedArray.length()).mapNotNull { index ->
+                    verifiedArray.optString(index).trim().takeIf { it.isNotBlank() }
+                } + linkedIdentities.map { it.email }
+            ).distinctBy { it.lowercase() }
             val colorsObject = root.optJSONObject("categoryColors") ?: JSONObject()
             val categoryColors = buildMap<String, String> {
                 colorsObject.keys().forEach { key ->
@@ -379,7 +394,9 @@ class NativeVault(context: Context) {
                     .takeIf { it in setOf(15, 30, 60, 120) } ?: 30,
                 settings.optBoolean("reauthOnReveal", false),
                 settings.optInt("trashRetentionDays", 30)
-                    .takeIf { it in setOf(0, 7, 30, 90) } ?: 30
+                    .takeIf { it in setOf(0, 7, 30, 90) } ?: 30,
+                p.optString("username"),
+                verifiedEmails
             )
         }
 
@@ -461,7 +478,9 @@ class NativeVault(context: Context) {
                 accounts = restored.accounts,
                 categoryColors = restored.categoryColors,
                 linkedIdentities = restored.linkedIdentities,
-                trash = restored.trash
+                trash = restored.trash,
+                username = restored.username,
+                verifiedEmails = restored.verifiedEmails
             )
         }
     }
