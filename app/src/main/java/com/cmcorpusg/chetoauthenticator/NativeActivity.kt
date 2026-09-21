@@ -36,6 +36,8 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -53,6 +55,8 @@ class NativeActivity : FragmentActivity() {
     private var photoAccount: String? = null
     private var stagedPhoto by mutableStateOf<String?>(null)
     private var biometricReady by mutableStateOf(false)
+    private var autoLockJob: Job? = null
+    private var backgroundAtMillis: Long = 0L
     private var pendingBiometricEnable = false
     private val enrollBiometric = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         external=false
@@ -137,18 +141,56 @@ class NativeActivity : FragmentActivity() {
                         store.read()
                     }.onSuccess { persisted->vault=persisted;exists=true }
                         .onFailure { message("No se pudo guardar el perfil") }
-                },onBiometric=::biometric,onBiometricSetup=::requestBiometricSetup,onUpdate=::update,
+                },onBiometric=::biometric,onBiometricSetup=::requestBiometricSetup,onChangePin=::changePin,onUpdate=::update,
                 onScan={ photo -> external=true;if(photo)pickQr.launch("image/*") else GmsBarcodeScanning.getClient(this).startScan()
                     .addOnSuccessListener { it.rawValue?.let(::receiveQr) }.addOnFailureListener { message("Escáner no disponible. Usa una imagen o la clave manual.") }
                     .addOnCompleteListener { external=false } },
                 onScannedConsumed={scanned=null},onCopy=::copyCode,onBackup=::backup,
                 onPhoto={ account -> photoAccount=account;external=true;pickPhoto.launch("image/*") },
-                onPhotoConsumed={stagedPhoto=null},onLock={vault=null;scanned=null},onMessage=::message)
+                onPhotoConsumed={stagedPhoto=null},onLock=::lockNow,onMessage=::message)
         }
     }
-    override fun onResume(){super.onResume();if(::store.isInitialized)refreshBiometricReady()}
-    override fun onStop(){super.onStop();if(!external){vault=null;scanned=null;stagedPhoto=null;window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)}}
+    override fun onResume(){
+        super.onResume()
+        if(::store.isInitialized)refreshBiometricReady()
+        autoLockJob?.cancel()
+        autoLockJob=null
+        val current=vault
+        if(!external && current!=null && backgroundAtMillis>0L && current.lockTimeoutSeconds>0){
+            val elapsed=System.currentTimeMillis()-backgroundAtMillis
+            if(elapsed>=current.lockTimeoutSeconds*1000L) lockNow()
+        }
+        backgroundAtMillis=0L
+    }
+    override fun onStop(){
+        super.onStop()
+        if(!external){
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            scanned=null
+            stagedPhoto=null
+            val current=vault ?: return
+            backgroundAtMillis=System.currentTimeMillis()
+            autoLockJob?.cancel()
+            if(current.lockTimeoutSeconds<=0){
+                lockNow()
+            }else{
+                autoLockJob=lifecycleScope.launch {
+                    delay(current.lockTimeoutSeconds*1000L)
+                    lockNow()
+                }
+            }
+        }
+    }
     private fun message(value: String){Toast.makeText(this,value,Toast.LENGTH_LONG).show()}
+    private fun lockNow(){
+        autoLockJob?.cancel()
+        autoLockJob=null
+        backgroundAtMillis=0L
+        vault=null
+        scanned=null
+        stagedPhoto=null
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }
     private fun applySettings(s: MobileVault){if(s.screenshots)window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) else window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)}
     private fun update(s: MobileVault){
         runCatching {
@@ -162,6 +204,18 @@ class NativeActivity : FragmentActivity() {
             }
         }.onFailure { message("No se pudieron guardar los cambios") }
     }
+    private fun changePin(currentPin:String,newPin:String){
+        runCatching {
+            val verified=store.unlock(currentPin)
+            store.write(verified.copy(pin=newPin))
+            store.read()
+        }.onSuccess { persisted->
+            vault=persisted
+            applySettings(persisted)
+            message("PIN actualizado")
+        }.onFailure { message(it.message ?: "No se pudo cambiar el PIN") }
+    }
+
     private fun work(success: String,action: suspend ()->Unit){
         busy=true;lifecycleScope.launch {
             try{withContext(Dispatchers.IO){action()};message(success)}catch(e:Exception){message("No se pudo completar. Verifica el archivo, la contraseña o la conexión.")}
@@ -187,7 +241,7 @@ class NativeActivity : FragmentActivity() {
         clip.description.extras=android.os.PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE",true) }
         val clipboard=getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(clip);message("Código copiado")
-        lifecycleScope.launch { kotlinx.coroutines.delay(30_000);if(clipboard.primaryClip?.getItemAt(0)?.text?.toString()==value)clipboard.setPrimaryClip(ClipData.newPlainText("","")) }
+        lifecycleScope.launch { delay(30_000);if(clipboard.primaryClip?.getItemAt(0)?.text?.toString()==value)clipboard.setPrimaryClip(ClipData.newPlainText("","")) }
     }
     private fun refreshBiometricReady(){
         biometricReady=BiometricManager.from(this)
