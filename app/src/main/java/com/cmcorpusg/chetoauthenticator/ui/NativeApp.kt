@@ -85,7 +85,7 @@ fun NativeApp(
     onLogin:(String)->Unit,onRegister:(String,String,String)->Unit,onBiometric:()->Unit,onBiometricSetup:()->Unit,
     onVerifyPin:(String)->Boolean,onVerifyBiometric:((()->Unit))->Unit,
     onChangePin:(String,String)->Unit,onUpdate:(MobileVault)->Unit,onScan:(Boolean)->Unit,onScannedConsumed:()->Unit,onCopy:(String)->Unit,
-    onBackup:(String,String)->Unit,onPhoto:(String?)->Unit,onPhotoConsumed:()->Unit,onLock:()->Unit,onMessage:(String)->Unit
+    onBackup:(String,String)->Unit,onDisableBackup:()->Unit,onPhoto:(String?)->Unit,onPhotoConsumed:()->Unit,onLock:()->Unit,onMessage:(String)->Unit
 ){
     ChetoTheme(dark=vault?.dark==true){
         Surface(Modifier.fillMaxSize()){
@@ -174,12 +174,24 @@ fun NativeApp(
                                 },
                                 {manageCategories=true}
                             )
-                            "Backup"->BackupPage(busy){ mode->
-                                critical=PendingCriticalAction(
-                                    "Acceso al respaldo",
-                                    "Confirma tu identidad antes de exportar, restaurar o sincronizar la bóveda."
-                                ){backupMode=mode}
-                            }
+                            "Backup"->BackupPage(
+                                busy=busy,
+                                action={ mode->
+                                    critical=PendingCriticalAction(
+                                        "Acceso al respaldo",
+                                        "Confirma tu identidad antes de exportar, restaurar o sincronizar la bóveda."
+                                    ){backupMode=mode}
+                                },
+                                onDisableAuto={ after->
+                                    critical=PendingCriticalAction(
+                                        "Desactivar backup automático",
+                                        "Sin backup automático, los cambios futuros dependerán de tus copias manuales."
+                                    ){
+                                        onDisableBackup()
+                                        after()
+                                    }
+                                }
+                            )
                             "Perfil"->UserProfileScreen(vault,onUpdate,{onPhoto(null)},onMessage)
                             "Ajustes"->SettingsPage(
                                 vault,
