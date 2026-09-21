@@ -92,24 +92,41 @@ class NativeVault(context: Context) {
 
     @Synchronized
     fun unlock(pin: String): MobileVault {
-        check(System.currentTimeMillis() >= prefs.getLong("lockedUntil", 0)) {
-            "Espera 30 segundos antes de reintentar"
+        val now = System.currentTimeMillis()
+        val lockedUntil = prefs.getLong("lockedUntil", 0)
+        if (now < lockedUntil) {
+            val seconds = ((lockedUntil - now + 999) / 1000).coerceAtLeast(1)
+            error("CHETO está bloqueado. Reintenta en $seconds s")
         }
 
         val state = read()
         if (!PinSecurity.verify(pin, state.pin)) {
             val attempts = prefs.getInt("attempts", 0) + 1
-            prefs.edit()
-                .putInt("attempts", if (attempts >= 5) 0 else attempts)
-                .putLong(
-                    "lockedUntil",
-                    if (attempts >= 5) System.currentTimeMillis() + 30_000 else 0
-                )
-                .commit()
-            error("PIN incorrecto")
+            if (attempts >= MAX_PIN_ATTEMPTS) {
+                val cycle = (prefs.getInt("lockCycle", 0) + 1).coerceAtMost(4)
+                val duration = when (cycle) {
+                    1 -> 30_000L
+                    2 -> 120_000L
+                    3 -> 300_000L
+                    else -> 900_000L
+                }
+                prefs.edit()
+                    .putInt("attempts", 0)
+                    .putInt("lockCycle", cycle)
+                    .putLong("lockedUntil", now + duration)
+                    .commit()
+                error("Demasiados intentos. CHETO se bloqueó por ${duration / 60_000L} min")
+            } else {
+                prefs.edit().putInt("attempts", attempts).commit()
+                error("PIN incorrecto. Quedan ${MAX_PIN_ATTEMPTS - attempts} intentos")
+            }
         }
 
-        prefs.edit().putInt("attempts", 0).remove("lockedUntil").commit()
+        prefs.edit()
+            .putInt("attempts", 0)
+            .putInt("lockCycle", 0)
+            .remove("lockedUntil")
+            .commit()
 
         // Transparent migration for the first native snapshot, which persisted
         // the raw six digits inside the already-encrypted vault.
@@ -122,6 +139,8 @@ class NativeVault(context: Context) {
     }
 
     companion object {
+        private const val MAX_PIN_ATTEMPTS = 5
+
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
