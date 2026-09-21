@@ -28,6 +28,13 @@ data class TrashedAccount(
     val deletedAtEpochMillis: Long = System.currentTimeMillis()
 )
 
+data class BackupInspection(
+    val accountCount: Int,
+    val categoryCount: Int,
+    val linkedIdentityCount: Int,
+    val trashedAccountCount: Int
+)
+
 data class LinkedIdentity(
     val provider: String,
     val subject: String,
@@ -403,6 +410,16 @@ class NativeVault(context: Context) {
                 .put("iv", b64(iv))
                 .put("data", b64(cipher.doFinal(payload.toByteArray())))
                 .toString()
+        }
+
+        fun inspectBackup(data: String, password: String): BackupInspection {
+            val restored = restore(data, password, MobileVault())
+            return BackupInspection(
+                accountCount = restored.accounts.size,
+                categoryCount = restored.categories.size,
+                linkedIdentityCount = restored.linkedIdentities.size,
+                trashedAccountCount = restored.trash.size
+            )
         }
 
         fun restore(data: String, password: String, current: MobileVault): MobileVault {
