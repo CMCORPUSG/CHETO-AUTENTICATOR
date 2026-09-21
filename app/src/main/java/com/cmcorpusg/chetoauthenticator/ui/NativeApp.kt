@@ -252,10 +252,20 @@ fun NativeApp(
         Field("Nombre",name,{name=it});Button(onClick={if(name.isNotBlank()){onUpdate(v.copy(name=name.trim()));onMessage("Perfil guardado")}}){Text("Guardar nombre")}
         Text("Correos locales",style=MaterialTheme.typography.titleLarge)
         Text("Son etiquetas de tu perfil; no inician sesión ni verifican la dirección.",style=MaterialTheme.typography.bodySmall)
-        v.emails.forEachIndexed { index,e->Card(Modifier.fillMaxWidth()){Column(Modifier.padding(14.dp)){
-            Text(e,fontWeight=FontWeight.Bold);if(index==0)Text("Principal",color=MaterialTheme.colorScheme.primary)
-            Row{if(index!=0)TextButton(onClick={onUpdate(v.copy(emails=listOf(e)+(v.emails-e)))}){Text("Hacer principal")};TextButton(onClick={onUpdate(v.copy(emails=v.emails-e))}){Text("Eliminar")}}
-        }}}
+        v.emails.forEachIndexed { index,e->Card(Modifier.fillMaxWidth()){
+            Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                Avatar(EmailProvider.nameFor(e),EmailProvider.logoUrlFor(e).orEmpty())
+                Column(Modifier.weight(1f)){
+                    Text(e,fontWeight=FontWeight.Bold)
+                    Text(EmailProvider.nameFor(e),style=MaterialTheme.typography.bodySmall)
+                    if(index==0)Text("Principal",color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.labelMedium)
+                    Row{
+                        if(index!=0)TextButton(onClick={onUpdate(v.copy(emails=listOf(e)+(v.emails-e)))}){Text("Hacer principal")}
+                        TextButton(onClick={onUpdate(v.copy(emails=v.emails-e))}){Text("Eliminar")}
+                    }
+                }
+            }
+        }}
         Field("Agregar correo",email,{email=it},keyboard=KeyboardType.Email)
         Button(onClick={val e=email.trim();if(!android.util.Patterns.EMAIL_ADDRESS.matcher(e).matches()||v.emails.any { it.equals(e,true) })onMessage("Introduce un correo válido y no repetido")else{onUpdate(v.copy(emails=v.emails+e));email=""}}){Text("Agregar correo")}
     }
