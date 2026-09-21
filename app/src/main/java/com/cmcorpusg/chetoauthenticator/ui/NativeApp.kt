@@ -64,8 +64,8 @@ import com.cmcorpusg.chetoauthenticator.data.MobileVault
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 
-private val Blue=Color(0xFF3157F6)
-private val Purple=Color(0xFF7144E8)
+private val Blue=ChetoBlue
+private val Purple=ChetoViolet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +75,7 @@ fun NativeApp(
     onUpdate:(MobileVault)->Unit,onScan:(Boolean)->Unit,onScannedConsumed:()->Unit,onCopy:(String)->Unit,
     onBackup:(String,String)->Unit,onPhoto:(String?)->Unit,onPhotoConsumed:()->Unit,onLock:()->Unit,onMessage:(String)->Unit
 ){
-    MaterialTheme(colorScheme=if(vault?.dark==true)darkColorScheme(primary=Color(0xFF98AAFF)) else lightColorScheme(primary=Blue,background=Color(0xFFF4F6FB))){
+    ChetoTheme(dark=vault?.dark==true){
         Surface(Modifier.fillMaxSize()){
             if(vault==null){LoginScreen(exists,onLogin,onRegister,onBiometric,onMessage);return@Surface}
             var page by remember { mutableStateOf("Inicio") }
@@ -91,18 +91,24 @@ fun NativeApp(
             BackHandler { when { editor!=null->editor=null;manageCategories->manageCategories=false;page!="Inicio"->page="Inicio";else->onLock() } }
             Scaffold(
                 topBar={
-                    Column(Modifier.background(Brush.linearGradient(listOf(Blue,Purple))).statusBarsPadding().fillMaxWidth().padding(20.dp)){
-                        Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){
-                            Text("CHETO",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.Black)
-                            Text(if(manageCategories)"Categorías" else page,color=Color.White.copy(alpha=.8f),fontSize=13.sp)
-                            Text("Lima · " + LimaClock.nowLabel(clockMillis),color=Color.White.copy(alpha=.72f),fontSize=11.sp)
-                        };TextButton(onClick=onLock){
-                            Icon(Icons.Rounded.Lock,contentDescription="Bloquear",tint=Color.White)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Bloquear",color=Color.White)
-                        }}
+                    Column(
+                        Modifier.background(Brush.linearGradient(listOf(Color(0xFF263EAF),Blue,Purple)))
+                            .statusBarsPadding().fillMaxWidth().padding(horizontal=18.dp,vertical=13.dp)
+                    ){
+                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                            Surface(shape=RoundedCornerShape(13.dp),color=Color.White.copy(alpha=.15f),modifier=Modifier.size(42.dp)){
+                                Box(contentAlignment=Alignment.Center){
+                                    Icon(Icons.Rounded.Shield,contentDescription=null,tint=Color.White,modifier=Modifier.size(23.dp))
+                                }
+                            }
+                            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(1.dp)){
+                                Text(if(manageCategories)"Categorías" else page,color=Color.White,fontSize=19.sp,fontWeight=FontWeight.Bold)
+                                Text("CHETO · Lima · " + LimaClock.nowLabel(clockMillis),color=Color.White.copy(alpha=.72f),style=MaterialTheme.typography.labelSmall)
+                            }
+                            IconButton(onClick=onLock){Icon(Icons.Rounded.Lock,contentDescription="Bloquear",tint=Color.White)}
+                        }
                     }
-                },bottomBar={if(!manageCategories)NavigationBar {
+                },bottomBar={if(!manageCategories)NavigationBar(containerColor=MaterialTheme.colorScheme.surface,tonalElevation=3.dp) {
                     val destinations=listOf(
                         Triple("Inicio",Icons.Rounded.Home,"Inicio"),
                         Triple("Backup",Icons.Rounded.Cloud,"Backup"),
@@ -117,7 +123,7 @@ fun NativeApp(
                             label={Text(label)}
                         )
                     }
-                }},floatingActionButton={if(page=="Inicio"&&!manageCategories)FloatingActionButton(onClick={editor=MobileAccount()},containerColor=Blue,contentColor=Color.White){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
+                }},floatingActionButton={if(page=="Inicio"&&!manageCategories)FloatingActionButton(onClick={editor=MobileAccount()},containerColor=Blue,contentColor=Color.White,shape=RoundedCornerShape(17.dp)){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
             ){padding->
                 Column(Modifier.padding(padding).fillMaxSize()){
                     if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -157,117 +163,59 @@ fun NativeApp(
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
 
-    Column(
-        Modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF152A70),Blue,Purple)))
-            .safeDrawingPadding()
-            .imePadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal=24.dp,vertical=30.dp),
-        horizontalAlignment=Alignment.CenterHorizontally,
-        verticalArrangement=Arrangement.Center
-    ){
-        Surface(
-            modifier=Modifier.size(82.dp),
-            shape=RoundedCornerShape(24.dp),
-            color=Color.White.copy(alpha=.14f)
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF172968),Color(0xFF314FD5),Purple)))){
+        Box(Modifier.size(260.dp).offset(x=190.dp,y=(-80).dp).background(Color.White.copy(alpha=.05f),CircleShape))
+        Column(
+            Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(horizontal=22.dp,vertical=24.dp),
+            horizontalAlignment=Alignment.CenterHorizontally,
+            verticalArrangement=Arrangement.Center
         ){
-            Box(contentAlignment=Alignment.Center){
-                Icon(Icons.Rounded.Shield,contentDescription=null,tint=Color.White,modifier=Modifier.size(44.dp))
+            Surface(modifier=Modifier.size(66.dp),shape=RoundedCornerShape(21.dp),color=Color.White.copy(alpha=.13f)){
+                Box(contentAlignment=Alignment.Center){Icon(Icons.Rounded.Shield,contentDescription=null,tint=Color.White,modifier=Modifier.size(34.dp))}
             }
-        }
-        Spacer(Modifier.height(14.dp))
-        Text("CHETO",color=Color.White,fontSize=38.sp,fontWeight=FontWeight.Black)
-        Text(
-            if(exists)"Desbloquea tu autenticador" else "Crea tu bóveda segura",
-            color=Color.White.copy(alpha=.82f),
-            fontSize=15.sp
-        )
-        Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
+            Text("CHETO",color=Color.White,style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Black)
+            Text(if(exists)"Tu autenticador, protegido" else "Configura tu bóveda segura",color=Color.White.copy(alpha=.76f),style=MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(22.dp))
 
-        Card(
-            modifier=Modifier.fillMaxWidth(),
-            shape=RoundedCornerShape(30.dp),
-            colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)
-        ){
-            Column(
-                Modifier.padding(22.dp),
-                verticalArrangement=Arrangement.spacedBy(14.dp),
-                horizontalAlignment=Alignment.CenterHorizontally
-            ){
-                Text(
-                    if(exists)"Bienvenido de nuevo" else "Registro inicial",
-                    style=MaterialTheme.typography.headlineSmall,
-                    fontWeight=FontWeight.Bold
-                )
-
-                if(exists){
-                    Text("Introduce tu PIN",style=MaterialTheme.typography.bodyMedium)
-                    Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
-                        repeat(6){ index->
-                            Box(
-                                Modifier.size(14.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if(index<pin.length) Blue
-                                        else MaterialTheme.colorScheme.outline.copy(alpha=.25f)
-                                    )
-                            )
-                        }
+            Card(modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(26.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),elevation=CardDefaults.cardElevation(10.dp)){
+                Column(Modifier.padding(horizontal=20.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(13.dp),horizontalAlignment=Alignment.CenterHorizontally){
+                    Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(3.dp)){
+                        Text(if(exists)"Hola de nuevo" else "Crea tu perfil",style=MaterialTheme.typography.headlineSmall)
+                        Text(if(exists)"Ingresa tu PIN de 6 dígitos" else "Solo toma un minuto",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    PinPad(
-                        pin=pin,
-                        onPinChange={pin=it},
-                        onSubmit={
-                            if(pin.length==6){
-                                onLogin(pin)
-                                pin=""
-                            }else onMessage("Completa los 6 dígitos")
-                        }
-                    )
-                    FilledTonalButton(onClick=onBio,modifier=Modifier.fillMaxWidth()){
-                        Icon(Icons.Rounded.Fingerprint,contentDescription=null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Entrar con biometría")
-                    }
-                }else{
-                    Field("Nombre",name,{name=it})
-                    Field("Correo principal",email,{email=it},keyboard=KeyboardType.Email)
-                    Field(
-                        "PIN de 6 dígitos",
-                        pin,
-                        {pin=it.filter(Char::isDigit).take(6)},
-                        password=true,
-                        keyboard=KeyboardType.NumberPassword
-                    )
-                    Field(
-                        "Repite tu PIN",
-                        confirm,
-                        {confirm=it.filter(Char::isDigit).take(6)},
-                        password=true,
-                        keyboard=KeyboardType.NumberPassword
-                    )
-                    Button(
-                        onClick={
-                            when{
-                                name.isBlank() -> onMessage("Escribe tu nombre")
-                                !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() ->
-                                    onMessage("Introduce un correo válido")
-                                pin.length!=6 -> onMessage("El PIN debe tener 6 dígitos")
-                                pin!=confirm -> onMessage("Los PIN no coinciden")
-                                else -> onRegister(name.trim(),email.trim(),pin)
+                    if(exists){
+                        Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                            repeat(6){ index->
+                                Box(Modifier.size(if(index<pin.length)11.dp else 10.dp).clip(CircleShape).background(if(index<pin.length)Blue else MaterialTheme.colorScheme.outlineVariant))
                             }
-                        },
-                        modifier=Modifier.fillMaxWidth()
-                    ){Text("Crear perfil seguro")}
+                        }
+                        PinPad(pin,{pin=it}){
+                            if(pin.length==6){onLogin(pin);pin=""}else onMessage("Completa los 6 dígitos")
+                        }
+                        FilledTonalButton(onClick=onBio,modifier=Modifier.fillMaxWidth().height(44.dp),shape=ControlShape){
+                            Icon(Icons.Rounded.Fingerprint,contentDescription=null,modifier=Modifier.size(20.dp));Spacer(Modifier.width(8.dp));Text("Usar biometría")
+                        }
+                    }else{
+                        Field("Nombre",name,{name=it})
+                        Field("Correo",email,{email=it},keyboard=KeyboardType.Email)
+                        Field("PIN de 6 dígitos",pin,{pin=it.filter(Char::isDigit).take(6)},password=true,keyboard=KeyboardType.NumberPassword)
+                        Field("Confirmar PIN",confirm,{confirm=it.filter(Char::isDigit).take(6)},password=true,keyboard=KeyboardType.NumberPassword)
+                        Button(onClick={
+                            when{
+                                name.isBlank()->onMessage("Escribe tu nombre")
+                                !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()->onMessage("Introduce un correo válido")
+                                pin.length!=6->onMessage("El PIN debe tener 6 dígitos")
+                                pin!=confirm->onMessage("Los PIN no coinciden")
+                                else->onRegister(name.trim(),email.trim(),pin)
+                            }
+                        },modifier=Modifier.fillMaxWidth().height(46.dp),shape=ControlShape){Text("Crear bóveda")}
+                    }
+                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        Icon(Icons.Rounded.Lock,contentDescription=null,modifier=Modifier.size(14.dp),tint=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Cifrado local · funciona sin internet",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-
-                HorizontalDivider()
-                Text(
-                    "Tus códigos TOTP se generan sin internet. PIN y secretos se almacenan cifrados localmente.",
-                    style=MaterialTheme.typography.bodySmall,
-                    color=MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }
@@ -284,11 +232,11 @@ fun NativeApp(
         listOf("7","8","9"),
         listOf("⌫","0","✓")
     )
-    Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
+    Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
         rows.forEach { row->
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement=Arrangement.spacedBy(10.dp)
+                horizontalArrangement=Arrangement.spacedBy(8.dp)
             ){
                 row.forEach { key->
                     FilledTonalButton(
@@ -299,11 +247,11 @@ fun NativeApp(
                                 else -> if(pin.length<6)onPinChange(pin+key)
                             }
                         },
-                        modifier=Modifier.weight(1f).height(54.dp),
-                        shape=RoundedCornerShape(18.dp),
+                        modifier=Modifier.weight(1f).height(48.dp),
+                        shape=RoundedCornerShape(15.dp),
                         contentPadding=PaddingValues(0.dp)
                     ){
-                        Text(key,fontSize=20.sp,fontWeight=FontWeight.Bold)
+                        Text(key,fontSize=18.sp,fontWeight=FontWeight.SemiBold)
                     }
                 }
             }
