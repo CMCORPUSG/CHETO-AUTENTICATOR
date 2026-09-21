@@ -48,7 +48,8 @@ data class MobileVault(
     val lockTimeoutSeconds: Int = 0,
     val linkedIdentities: List<LinkedIdentity> = emptyList(),
     val trash: List<TrashedAccount> = emptyList(),
-    val clipboardClearSeconds: Int = 30
+    val clipboardClearSeconds: Int = 30,
+    val reauthOnReveal: Boolean = false
 )
 
 class NativeVault(context: Context) {
@@ -164,7 +165,7 @@ class NativeVault(context: Context) {
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
-        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 9).put("pin", s.pin)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 10).put("pin", s.pin)
             .put(
                 "profile",
                 JSONObject()
@@ -215,6 +216,7 @@ class NativeVault(context: Context) {
                     .put("screenshots", s.screenshots)
                     .put("lockTimeoutSeconds", s.lockTimeoutSeconds)
                     .put("clipboardClearSeconds", s.clipboardClearSeconds)
+                    .put("reauthOnReveal", s.reauthOnReveal)
             )
             .put(
                 "accounts",
@@ -357,7 +359,8 @@ class NativeVault(context: Context) {
                 linkedIdentities,
                 trash,
                 settings.optInt("clipboardClearSeconds", 30)
-                    .takeIf { it in setOf(15, 30, 60, 120) } ?: 30
+                    .takeIf { it in setOf(15, 30, 60, 120) } ?: 30,
+                settings.optBoolean("reauthOnReveal", false)
             )
         }
 
