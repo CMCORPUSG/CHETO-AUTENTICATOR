@@ -83,7 +83,8 @@ private data class PendingCriticalAction(
 @Composable
 fun NativeApp(
     vault:MobileVault?,exists:Boolean,busy:Boolean,scanned:MobileAccount?,stagedPhoto:String?,biometricReady:Boolean,
-    onLogin:(String)->Unit,onRegister:(String,String,String)->Unit,onBiometric:()->Unit,onBiometricSetup:()->Unit,
+    onLogin:(String)->Unit,onRegister:(String,String,String)->Unit,onRecoverVault:(String,String)->Unit,
+    onBiometric:()->Unit,onBiometricSetup:()->Unit,
     onVerifyPin:(String)->Boolean,onVerifyBiometric:((()->Unit))->Unit,
     onChangePin:(String,String)->Unit,onUpdate:(MobileVault)->Unit,onScan:(Boolean)->Unit,onScannedConsumed:()->Unit,onCopy:(String)->Unit,
     onBackup:(String,String)->Unit,onDisableBackup:()->Unit,
@@ -93,7 +94,7 @@ fun NativeApp(
 ){
     ChetoTheme(dark=vault?.dark==true){
         Surface(Modifier.fillMaxSize()){
-            if(vault==null){LoginScreen(exists,onLogin,onRegister,onBiometric,onMessage);return@Surface}
+            if(vault==null){LoginScreen(exists,onLogin,onRegister,onRecoverVault,onBiometric,onMessage);return@Surface}
             var page by remember { mutableStateOf("Inicio") }
             var editor by remember { mutableStateOf<MobileAccount?>(null) }
             var addAccount by remember { mutableStateOf(false) }
@@ -419,6 +420,7 @@ fun NativeApp(
     exists:Boolean,
     onLogin:(String)->Unit,
     onRegister:(String,String,String)->Unit,
+    onRecoverVault:(String,String)->Unit,
     onBio:()->Unit,
     onMessage:(String)->Unit
 ){
@@ -426,6 +428,7 @@ fun NativeApp(
     var email by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
+    var showRecovery by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF172968),Color(0xFF314FD5),Purple)))){
         Box(Modifier.size(260.dp).offset(x=190.dp,y=(-80).dp).background(Color.White.copy(alpha=.05f),CircleShape))
@@ -460,6 +463,12 @@ fun NativeApp(
                         FilledTonalButton(onClick=onBio,modifier=Modifier.fillMaxWidth().height(44.dp),shape=ControlShape){
                             Icon(Icons.Rounded.Fingerprint,contentDescription=null,modifier=Modifier.size(20.dp));Spacer(Modifier.width(8.dp));Text("Usar biometría")
                         }
+                        TextButton(
+                            onClick={showRecovery=true},
+                            modifier=Modifier.fillMaxWidth()
+                        ){
+                            Text("¿Olvidaste el PIN? Recuperar desde .cheto")
+                        }
                     }else{
                         Field("Nombre",name,{name=it})
                         Field("Correo",email,{email=it},keyboard=KeyboardType.Email)
@@ -482,6 +491,16 @@ fun NativeApp(
                 }
             }
         }
+    }
+    if(showRecovery){
+        RecoveryVaultDialog(
+            onDismiss={showRecovery=false},
+            onConfirm={newPin,password->
+                showRecovery=false
+                onRecoverVault(newPin,password)
+            },
+            onMessage=onMessage
+        )
     }
 }
 
@@ -1406,6 +1425,63 @@ internal fun categoryColor(name:String,overrides:Map<String,String>):Color =
                 if(pin.length!=6) onMessage("Introduce tu PIN de 6 dígitos")
                 else if(onVerifyPin(pin)) onConfirmed()
             }){Text("Confirmar con PIN")}
+        },
+        dismissButton={TextButton(onClick=onDismiss){Text("Cancelar")}}
+    )
+}
+
+@Composable private fun RecoveryVaultDialog(
+    onDismiss:()->Unit,
+    onConfirm:(String,String)->Unit,
+    onMessage:(String)->Unit
+){
+    var newPin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest=onDismiss,
+        title={Text("Recuperar bóveda")},
+        text={
+            Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+                Text(
+                    "Seleccionarás una copia .cheto cifrada. La contraseña de recuperación permitirá crear un nuevo PIN local sin conocer el PIN anterior."
+                )
+                Field(
+                    "Nuevo PIN de 6 dígitos",
+                    newPin,
+                    {newPin=it.filter(Char::isDigit).take(6)},
+                    password=true,
+                    keyboard=KeyboardType.NumberPassword
+                )
+                Field(
+                    "Confirmar nuevo PIN",
+                    confirmPin,
+                    {confirmPin=it.filter(Char::isDigit).take(6)},
+                    password=true,
+                    keyboard=KeyboardType.NumberPassword
+                )
+                Field(
+                    "Contraseña de recuperación",
+                    password,
+                    {password=it},
+                    password=true
+                )
+                Text(
+                    "CHETO no puede recuperar una copia si olvidaste también su contraseña.",
+                    style=MaterialTheme.typography.bodySmall,
+                    color=MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton={
+            TextButton(onClick={
+                when{
+                    newPin.length!=6 -> onMessage("El nuevo PIN debe tener 6 dígitos")
+                    newPin!=confirmPin -> onMessage("Los PIN no coinciden")
+                    password.length<10 -> onMessage("La contraseña de recuperación debe tener al menos 10 caracteres")
+                    else -> onConfirm(newPin,password)
+                }
+            }){Text("Elegir copia .cheto")}
         },
         dismissButton={TextButton(onClick=onDismiss){Text("Cancelar")}}
     )
