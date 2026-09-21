@@ -15,7 +15,9 @@ class NativeVaultBackupInstrumentedTest {
         val source = MobileVault(
             pin = "111111",
             name = "Usuario CHETO",
+            username = "usuario.cheto",
             emails = listOf("main@example.com", "second@example.com"),
+            verifiedEmails = listOf("main@example.com"),
             photo = "https://example.com/avatar.png",
             categories = listOf("Sin categoría", "Trabajo", "Social"),
             accounts = listOf(
@@ -72,7 +74,9 @@ class NativeVaultBackupInstrumentedTest {
         val restored = NativeVault.restore(encrypted, password, localDevice)
 
         assertEquals(source.name, restored.name)
+        assertEquals(source.username, restored.username)
         assertEquals(source.emails, restored.emails)
+        assertEquals(source.verifiedEmails, restored.verifiedEmails)
         assertEquals(source.photo, restored.photo)
         assertEquals(source.categories, restored.categories)
         assertEquals(source.accounts, restored.accounts)
