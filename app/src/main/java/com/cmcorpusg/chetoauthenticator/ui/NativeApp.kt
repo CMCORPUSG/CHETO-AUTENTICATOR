@@ -1075,7 +1075,7 @@ private fun categoryColor(name:String,overrides:Map<String,String>):Color =
         }
 
         Text(
-            "CHETO Authenticator 0.6.0\nAndroid nativo · Kotlin + Jetpack Compose",
+            "CHETO Authenticator 0.7.0\nAndroid nativo · Kotlin + Jetpack Compose",
             style=MaterialTheme.typography.bodySmall,
             color=MaterialTheme.colorScheme.onSurfaceVariant
         )
