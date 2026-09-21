@@ -142,6 +142,16 @@ internal fun BackupPage(
         )
         if (automatic) {
             OutlinedButton(
+                onClick = { action("driveRestoreMerge") },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                shape = ControlShape
+            ) {
+                Text("Fusionar última copia de Drive")
+            }
+        }
+        if (automatic) {
+            OutlinedButton(
                 onClick = { onDisableAuto { automatic = false } },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth().height(43.dp),
