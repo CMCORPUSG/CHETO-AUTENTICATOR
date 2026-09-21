@@ -8,7 +8,7 @@ import java.util.Locale
 object LimaClock {
     private val zone = ZoneId.of("America/Lima")
     private val formatter = DateTimeFormatter
-        .ofPattern("HH:mm · dd MMM", Locale("es", "PE"))
+        .ofPattern("HH:mm · dd MMM", Locale.forLanguageTag("es-PE"))
         .withZone(zone)
 
     fun nowLabel(epochMillis: Long = System.currentTimeMillis()): String =
