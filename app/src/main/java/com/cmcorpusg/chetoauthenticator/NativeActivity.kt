@@ -93,11 +93,24 @@ class NativeActivity : FragmentActivity() {
                 while(true){val n=input.read(buffer);if(n<0)break;require(out.size()+n<=16_000_000){"Archivo demasiado grande"};out.write(buffer,0,n)}
                 out.toByteArray()
             }
-            val restored=NativeVault.restore(bytes.decodeToString(),password,current)
-            val result = if(pendingRestoreMode=="merge") VaultMergePolicy.merge(current,restored) else restored
-            pendingRestoreMode="replace"
-            store.write(result)
-            withContext(Dispatchers.Main){if(vault!=null)vault=result}
+            val data=bytes.decodeToString()
+            if(pendingRestoreMode=="verify"){
+                val inspection=NativeVault.inspectBackup(data,password)
+                pendingRestoreMode="replace"
+                BackupSettings(this@NativeActivity).lastVerifiedBackupEpochMillis=System.currentTimeMillis()
+                withContext(Dispatchers.Main){
+                    message(
+                        "Copia válida · ${inspection.accountCount} cuentas · " +
+                            "${inspection.categoryCount} categorías · ${inspection.trashedAccountCount} en papelera"
+                    )
+                }
+            }else{
+                val restored=NativeVault.restore(data,password,current)
+                val result = if(pendingRestoreMode=="merge") VaultMergePolicy.merge(current,restored) else restored
+                pendingRestoreMode="replace"
+                store.write(result)
+                withContext(Dispatchers.Main){if(vault!=null)vault=result}
+            }
         }
     }
     private val recoverFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -651,6 +664,7 @@ class NativeActivity : FragmentActivity() {
         when(mode){
             "restore"->{pendingRestoreMode="replace";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
             "restoreMerge"->{pendingRestoreMode="merge";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
+            "verify"->{pendingRestoreMode="verify";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
             "driveRestore"->drive { token -> work("Copia de Drive restaurada") {
                 val data=DriveBackupClient("cheto_native_backup_").downloadLatest(token)?:error("Sin copias")
                 val restored=NativeVault.restore(data,password,current)
@@ -663,6 +677,17 @@ class NativeActivity : FragmentActivity() {
                 val merged=VaultMergePolicy.merge(current,restored)
                 store.write(merged)
                 withContext(Dispatchers.Main){if(vault!=null)vault=merged}
+            } }
+            "driveVerify"->drive { token -> work("Copia de Drive verificada") {
+                val data=DriveBackupClient("cheto_native_backup_").downloadLatest(token)?:error("Sin copias")
+                val inspection=NativeVault.inspectBackup(data,password)
+                BackupSettings(this@NativeActivity).lastVerifiedBackupEpochMillis=System.currentTimeMillis()
+                withContext(Dispatchers.Main){
+                    message(
+                        "Drive válido · ${inspection.accountCount} cuentas · " +
+                            "${inspection.categoryCount} categorías · ${inspection.linkedIdentityCount} identidades"
+                    )
+                }
             } }
             else -> if(mode.startsWith("exportSelected:")){
                 work("Elige dónde guardar la selección") {
