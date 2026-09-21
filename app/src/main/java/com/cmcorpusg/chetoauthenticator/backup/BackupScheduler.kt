@@ -19,7 +19,7 @@ object BackupScheduler {
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        val request = PeriodicWorkRequestBuilder<DriveBackupWorker>(24, TimeUnit.HOURS)
+        val request = PeriodicWorkRequestBuilder<NativeDriveBackupWorker>(24, TimeUnit.HOURS)
             .setConstraints(constraints)
             .build()
 
@@ -35,7 +35,7 @@ object BackupScheduler {
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        val request = OneTimeWorkRequestBuilder<DriveBackupWorker>()
+        val request = OneTimeWorkRequestBuilder<NativeDriveBackupWorker>()
             .setConstraints(constraints)
             .build()
 
