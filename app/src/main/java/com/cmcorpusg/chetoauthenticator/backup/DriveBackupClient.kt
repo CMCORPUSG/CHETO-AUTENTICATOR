@@ -8,6 +8,12 @@ import java.net.URLEncoder
 import java.util.UUID
 import org.json.JSONObject
 
+data class DriveBackupInfo(
+    val id: String,
+    val name: String,
+    val modifiedTime: String
+)
+
 class DriveBackupClient(private val prefix: String = "cheto_backup_") {
     fun upload(accessToken: String, encryptedPayload: String) {
         val boundary = "cheto-${UUID.randomUUID()}"
@@ -42,10 +48,14 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
     }
 
     fun downloadLatest(accessToken: String): String? {
-        val files = listBackups(accessToken, 1)
-        val id = files.firstOrNull()?.first ?: return null
+        val id = listBackups(accessToken, 1).firstOrNull()?.id ?: return null
+        return download(accessToken, id)
+    }
+
+    fun download(accessToken: String, fileId: String): String {
+        require(fileId.matches(Regex("[A-Za-z0-9_-]{5,}"))) { "Identificador de Drive inválido" }
         val connection = open(
-            "https://www.googleapis.com/drive/v3/files/$id?alt=media",
+            "https://www.googleapis.com/drive/v3/files/$fileId?alt=media",
             accessToken,
             "GET"
         )
@@ -53,11 +63,14 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
         return readBody(connection)
     }
 
+    fun listRecentBackups(accessToken: String, limit: Int = MAX_BACKUPS): List<DriveBackupInfo> =
+        listBackups(accessToken, limit.coerceIn(1, MAX_BACKUPS))
+
     private fun trimOldBackups(accessToken: String) {
         val files = listBackups(accessToken, 100)
-        files.drop(MAX_BACKUPS).forEach { (id, _) ->
+        files.drop(MAX_BACKUPS).forEach { backup ->
             val connection = open(
-                "https://www.googleapis.com/drive/v3/files/$id",
+                "https://www.googleapis.com/drive/v3/files/${backup.id}",
                 accessToken,
                 "DELETE"
             )
@@ -67,7 +80,7 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
         }
     }
 
-    private fun listBackups(accessToken: String, pageSize: Int): List<Pair<String, String>> {
+    private fun listBackups(accessToken: String, pageSize: Int): List<DriveBackupInfo> {
         val query = URLEncoder.encode(
             "name contains '$prefix' and trashed = false",
             Charsets.UTF_8.name()
@@ -84,7 +97,13 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
         return buildList {
             for (index in 0 until array.length()) {
                 val item = array.getJSONObject(index)
-                add(item.getString("id") to item.optString("name"))
+                add(
+                    DriveBackupInfo(
+                        id = item.getString("id"),
+                        name = item.optString("name"),
+                        modifiedTime = item.optString("modifiedTime")
+                    )
+                )
             }
         }
     }
