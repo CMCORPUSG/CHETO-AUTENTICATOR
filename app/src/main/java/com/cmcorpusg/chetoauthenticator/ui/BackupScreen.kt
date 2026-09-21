@@ -40,13 +40,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
+import com.cmcorpusg.chetoauthenticator.backup.DriveBackupInfo
 import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
+import java.time.Instant
 import com.cmcorpusg.chetoauthenticator.data.MobileVault
 
 @Composable
 internal fun BackupPage(
     vault: MobileVault,
     busy: Boolean,
+    driveBackups: List<DriveBackupInfo>,
+    onLoadDriveBackups: () -> Unit,
     action: (String) -> Unit,
     onDisableAuto: ((() -> Unit)) -> Unit
 ) {
@@ -164,6 +168,61 @@ internal fun BackupPage(
             onPrimary = { action("drive") },
             onSecondary = { action("driveRestore") }
         )
+        if (automatic) {
+            OutlinedButton(
+                onClick = onLoadDriveBackups,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                shape = ControlShape
+            ) {
+                Text(if (driveBackups.isEmpty()) "Cargar historial de Drive" else "Actualizar historial de Drive")
+            }
+        }
+
+        if (driveBackups.isNotEmpty()) {
+            SectionHeader("Historial de Drive", "CHETO conserva hasta 7 copias cifradas")
+            driveBackups.forEachIndexed { index, backup ->
+                PremiumCard(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        val millis = runCatching { Instant.parse(backup.modifiedTime).toEpochMilli() }.getOrNull()
+                        Text(
+                            if (index == 0) "Copia más reciente" else "Copia ${index + 1}",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            millis?.let(LimaClock::nowLabel) ?: backup.modifiedTime.ifBlank { backup.name },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { action("driveVerifyId:${backup.id}") },
+                                enabled = !busy,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = ControlShape
+                            ) {
+                                Text("Verificar")
+                            }
+                            Button(
+                                onClick = { action("driveRestoreId:${backup.id}") },
+                                enabled = !busy,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = ControlShape
+                            ) {
+                                Text("Restaurar")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (automatic) {
             OutlinedButton(
                 onClick = { action("driveVerify") },
