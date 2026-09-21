@@ -30,6 +30,8 @@ import com.cmcorpusg.chetoauthenticator.core.OtpAuthParser
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.data.*
 import com.cmcorpusg.chetoauthenticator.identity.GoogleIdentityClient
+import com.cmcorpusg.chetoauthenticator.identity.MicrosoftIdentityClient
+import com.cmcorpusg.chetoauthenticator.identity.MicrosoftSignInCancelledException
 import com.cmcorpusg.chetoauthenticator.ui.NativeApp
 import com.cmcorpusg.chetoauthenticator.ui.ServiceCatalog
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
@@ -153,7 +155,7 @@ class NativeActivity : FragmentActivity() {
                 googleIdentityConfigured=BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank(),
                 microsoftIdentityConfigured=BuildConfig.MICROSOFT_CLIENT_ID.isNotBlank(),
                 onLinkGoogle=::linkGoogleIdentity,
-                onLinkMicrosoft={ message(if(BuildConfig.MICROSOFT_CLIENT_ID.isBlank()) "Configura CHETO_MICROSOFT_CLIENT_ID para activar Microsoft" else "Microsoft Sign-In está preparado para la siguiente conexión MSAL") },
+                onLinkMicrosoft=::linkMicrosoftIdentity,
                 onUnlinkIdentity=::unlinkIdentity,
                 onScan={ photo -> external=true;if(photo)pickQr.launch("image/*") else GmsBarcodeScanning.getClient(this).startScan()
                     .addOnSuccessListener { it.rawValue?.let(::receiveQr) }.addOnFailureListener { message("Escáner no disponible. Usa una imagen o la clave manual.") }
@@ -297,6 +299,49 @@ class NativeActivity : FragmentActivity() {
                 message("Inicio de sesión con Google cancelado")
             }catch(e:Exception){
                 message(e.message ?: "No se pudo vincular la cuenta de Google")
+            }finally{
+                external=false
+            }
+        }
+    }
+
+    private fun linkMicrosoftIdentity(){
+        val current=vault ?: return
+        if(BuildConfig.MICROSOFT_CLIENT_ID.isBlank()){
+            message("Configura CHETO_MICROSOFT_CLIENT_ID y el archivo MSAL para activar Microsoft")
+            return
+        }
+        external=true
+        lifecycleScope.launch {
+            try{
+                val result=MicrosoftIdentityClient(this@NativeActivity).signIn()
+                val identity=LinkedIdentity(
+                    provider=result.provider,
+                    subject=result.subject,
+                    email=result.email,
+                    displayName=result.displayName,
+                    photo=result.photo
+                )
+                val latest=vault ?: current
+                val identities=latest.linkedIdentities
+                    .filterNot { it.provider==identity.provider && it.subject==identity.subject } + identity
+                val emails=if(latest.emails.any { it.equals(identity.email,true) }){
+                    latest.emails
+                }else{
+                    latest.emails + identity.email
+                }
+                update(
+                    latest.copy(
+                        linkedIdentities=identities,
+                        emails=emails,
+                        name=latest.name.ifBlank { identity.displayName }
+                    )
+                )
+                message("Cuenta de Microsoft vinculada")
+            }catch(_: MicrosoftSignInCancelledException){
+                message("Inicio de sesión con Microsoft cancelado")
+            }catch(e:Exception){
+                message(e.message ?: "No se pudo vincular la cuenta de Microsoft")
             }finally{
                 external=false
             }
