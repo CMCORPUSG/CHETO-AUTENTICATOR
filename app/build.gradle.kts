@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -8,6 +10,13 @@ fun String.asBuildConfigString(): String =
 
 val googleWebClientId = providers.gradleProperty("CHETO_GOOGLE_WEB_CLIENT_ID").orElse("").get()
 val microsoftClientId = providers.gradleProperty("CHETO_MICROSOFT_CLIENT_ID").orElse("").get()
+
+val releaseKeystoreFile = rootProject.file("keystore.properties")
+val releaseKeystore = Properties().apply {
+    if (releaseKeystoreFile.exists()) {
+        releaseKeystoreFile.inputStream().use(::load)
+    }
+}
 
 android {
     namespace = "com.cmcorpusg.chetoauthenticator"
@@ -26,8 +35,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseKeystoreFile.exists()) {
+            create("release") {
+                storeFile = rootProject.file(requireNotNull(releaseKeystore.getProperty("storeFile")))
+                storePassword = requireNotNull(releaseKeystore.getProperty("storePassword"))
+                keyAlias = requireNotNull(releaseKeystore.getProperty("keyAlias"))
+                keyPassword = requireNotNull(releaseKeystore.getProperty("keyPassword"))
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
