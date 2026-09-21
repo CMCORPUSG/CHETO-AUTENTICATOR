@@ -132,11 +132,11 @@ fun NativeApp(
             ){padding->
                 Column(Modifier.padding(padding).fillMaxSize()){
                     if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
-                    if(manageCategories){Categories(vault,onUpdate,{manageCategories=false},onMessage)}
+                    if(manageCategories){CategoryManagerScreen(vault,onUpdate,{manageCategories=false},onMessage)}
                     else when(page){
                         "Inicio"->HomeScreen(vault,onCopy,{editor=it},{delete=it},{manageCategories=true})
                         "Backup"->BackupScreen(busy){backupMode=it}
-                        "Perfil"->ProfileScreen(vault,onUpdate,{onPhoto(null)},onMessage)
+                        "Perfil"->UserProfileScreen(vault,onUpdate,{onPhoto(null)},onMessage)
                         "Ajustes"->SettingsScreen(vault,onUpdate,{manageCategories=true},{changePin=true})
                     }
                 }
@@ -492,7 +492,7 @@ fun NativeApp(
     }
 }
 
-private val categoryPalette=linkedMapOf(
+internal val categoryPalette=linkedMapOf(
     "#3157F6" to Color(0xFF3157F6),
     "#7C4DFF" to Color(0xFF7C4DFF),
     "#00897B" to Color(0xFF00897B),
@@ -501,7 +501,7 @@ private val categoryPalette=linkedMapOf(
     "#546E7A" to Color(0xFF546E7A)
 )
 
-private fun categoryColorHex(name:String,overrides:Map<String,String>):String{
+internal fun categoryColorHex(name:String,overrides:Map<String,String>):String{
     overrides[name]?.let { if(categoryPalette.containsKey(it.uppercase()))return it.uppercase() }
     val keys=categoryPalette.keys.toList()
     return keys[(name.hashCode() and Int.MAX_VALUE)%keys.size]
@@ -1066,7 +1066,7 @@ internal fun categoryColor(name:String,overrides:Map<String,String>):Color =
 }
 
 @Composable private fun Panel(title:String,description:String){Card(Modifier.fillMaxWidth()){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(title,fontWeight=FontWeight.Bold);Text(description,style=MaterialTheme.typography.bodyMedium)}}}
-@Composable private fun Field(label:String,value:String,onChange:(String)->Unit,password:Boolean=false,keyboard:KeyboardType=KeyboardType.Text,singleLine:Boolean=true){
+@Composable internal fun Field(label:String,value:String,onChange:(String)->Unit,password:Boolean=false,keyboard:KeyboardType=KeyboardType.Text,singleLine:Boolean=true){
     OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},modifier=Modifier.fillMaxWidth(),singleLine=singleLine,
         visualTransformation=if(password)PasswordVisualTransformation() else VisualTransformation.None,keyboardOptions=KeyboardOptions(keyboardType=keyboard),shape=ControlShape,
         colors=OutlinedTextFieldDefaults.colors(unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant))
