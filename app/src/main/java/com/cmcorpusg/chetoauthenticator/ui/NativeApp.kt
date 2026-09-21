@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Screenshot
@@ -92,7 +93,8 @@ fun NativeApp(
     onBackup:(String,String)->Unit,onDisableBackup:()->Unit,
     driveBackups:List<DriveBackupInfo>,onLoadDriveBackups:()->Unit,
     googleIdentityConfigured:Boolean,microsoftIdentityConfigured:Boolean,
-    onLinkGoogle:()->Unit,onLinkMicrosoft:()->Unit,onUnlinkIdentity:(String,String)->Unit,
+    onLinkGoogle:()->Unit,onLinkMicrosoft:()->Unit,onVerifyEmail:(String)->Unit,
+    onUnlinkIdentity:(String,String)->Unit,
     onPhoto:(String?)->Unit,onPhotoConsumed:()->Unit,onLock:()->Unit,onMessage:(String)->Unit
 ){
     ChetoTheme(dark=vault?.dark==true){
@@ -130,10 +132,12 @@ fun NativeApp(
                             .statusBarsPadding().fillMaxWidth().padding(horizontal=18.dp,vertical=13.dp)
                     ){
                         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                            Surface(shape=RoundedCornerShape(13.dp),color=Color.White.copy(alpha=.15f),modifier=Modifier.size(42.dp)){
-                                Box(contentAlignment=Alignment.Center){
-                                    Icon(Icons.Rounded.Shield,contentDescription=null,tint=Color.White,modifier=Modifier.size(23.dp))
-                                }
+                            Box(
+                                Modifier
+                                    .size(44.dp)
+                                    .clickable { page="Perfil"; manageCategories=false; securityCenter=false; about=false; trashScreen=false }
+                            ){
+                                ProfileAvatar(vault.name.ifBlank { "CHETO" }, vault.photo, 44)
                             }
                             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(1.dp)){
                                 Text(
@@ -142,13 +146,22 @@ fun NativeApp(
                                         securityCenter -> "Centro de seguridad"
                                         about -> "Acerca de CHETO"
                                         trashScreen -> "Papelera"
+                                        page=="Inicio" -> vault.name.ifBlank { "CHETO" }
                                         else -> page
                                     },
                                     color=Color.White,
                                     fontSize=19.sp,
                                     fontWeight=FontWeight.Bold
                                 )
-                                Text("CHETO · Lima · " + LimaClock.nowLabel(clockMillis),color=Color.White.copy(alpha=.72f),style=MaterialTheme.typography.labelSmall)
+                                Text(
+                                    buildString {
+                                        if(vault.username.isNotBlank()) append("@${vault.username} · ")
+                                        append("Lima · ")
+                                        append(LimaClock.nowLabel(clockMillis))
+                                    },
+                                    color=Color.White.copy(alpha=.72f),
+                                    style=MaterialTheme.typography.labelSmall
+                                )
                             }
                             IconButton(onClick=onLock){Icon(Icons.Rounded.Lock,contentDescription="Bloquear",tint=Color.White)}
                         }
@@ -360,6 +373,7 @@ fun NativeApp(
                                 microsoftConfigured=microsoftIdentityConfigured,
                                 onLinkGoogle=onLinkGoogle,
                                 onLinkMicrosoft=onLinkMicrosoft,
+                                onVerifyEmail=onVerifyEmail,
                                 onUnlinkIdentity={provider,subject->
                                     critical=PendingCriticalAction(
                                         "Desvincular identidad",
@@ -1389,9 +1403,28 @@ internal fun categoryColor(name:String,overrides:Map<String,String>):Color =
 
 @Composable private fun Panel(title:String,description:String){Card(Modifier.fillMaxWidth()){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(title,fontWeight=FontWeight.Bold);Text(description,style=MaterialTheme.typography.bodyMedium)}}}
 @Composable internal fun Field(label:String,value:String,onChange:(String)->Unit,password:Boolean=false,keyboard:KeyboardType=KeyboardType.Text,singleLine:Boolean=true){
-    OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},modifier=Modifier.fillMaxWidth(),singleLine=singleLine,
-        visualTransformation=if(password)PasswordVisualTransformation() else VisualTransformation.None,keyboardOptions=KeyboardOptions(keyboardType=keyboard),shape=ControlShape,
-        colors=OutlinedTextFieldDefaults.colors(unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant))
+    var passwordVisible by remember(password) { mutableStateOf(false) }
+    OutlinedTextField(
+        value=value,
+        onValueChange=onChange,
+        label={Text(label)},
+        modifier=Modifier.fillMaxWidth(),
+        singleLine=singleLine,
+        visualTransformation=if(password && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions=KeyboardOptions(keyboardType=keyboard),
+        trailingIcon=if(password) {
+            {
+                IconButton(onClick={passwordVisible=!passwordVisible}) {
+                    Icon(
+                        if(passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                        contentDescription=if(passwordVisible) "Ocultar contraseña" else "Ver contraseña"
+                    )
+                }
+            }
+        } else null,
+        shape=ControlShape,
+        colors=OutlinedTextFieldDefaults.colors(unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant)
+    )
 }
 @Composable private fun Choice(label:String,value:String,values:List<String>,onChange:(String)->Unit){
     var expanded by remember{mutableStateOf(false)}
@@ -1399,6 +1432,50 @@ internal fun categoryColor(name:String,overrides:Map<String,String>):Color =
         DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}){values.forEach { item->DropdownMenuItem(text={Text(item)},onClick={onChange(item);expanded=false}) }}
     }
 }
+@Composable internal fun ProfileAvatar(name:String,photo:String,size:Int=48){
+    val bitmap=remember(photo){
+        runCatching {
+            if(photo.startsWith("data:image/")){
+                Base64.decode(photo.substringAfter(','),Base64.DEFAULT)
+                    .let { BitmapFactory.decodeByteArray(it,0,it.size)?.asImageBitmap() }
+            } else null
+        }.getOrNull()
+    }
+    val remote=remember(photo){
+        photo.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+    }
+    Box(
+        Modifier.size(size.dp).clip(CircleShape).background(Blue),
+        contentAlignment=Alignment.Center
+    ){
+        Text(name.take(2).uppercase().ifBlank{"CH"},color=Color.White,fontWeight=FontWeight.Bold)
+        when {
+            bitmap!=null -> Image(
+                bitmap,
+                contentDescription="Foto de perfil",
+                modifier=Modifier.fillMaxSize(),
+                contentScale=ContentScale.Crop
+            )
+            remote!=null -> SubcomposeAsyncImage(
+                model=remote,
+                contentDescription="Foto de perfil",
+                modifier=Modifier.fillMaxSize(),
+                contentScale=ContentScale.Crop
+            ){
+                when(val state=painter.state){
+                    is AsyncImagePainter.State.Success -> Image(
+                        painter=state.painter,
+                        contentDescription="Foto de perfil",
+                        modifier=Modifier.fillMaxSize(),
+                        contentScale=ContentScale.Crop
+                    )
+                    else -> Unit
+                }
+            }
+        }
+    }
+}
+
 @Composable internal fun Avatar(name:String,photo:String,size:Int=48){
     val bitmap=remember(photo){
         runCatching {
