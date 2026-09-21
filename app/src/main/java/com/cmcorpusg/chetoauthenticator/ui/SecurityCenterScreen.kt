@@ -55,6 +55,8 @@ internal fun SecurityCenterScreen(
     }.getOrDefault(true)
     val recentBackup = backup.lastBackupEpochMillis > 0L &&
         System.currentTimeMillis() - backup.lastBackupEpochMillis < 48L * 60L * 60L * 1000L
+    val recentlyVerified = backup.lastVerifiedBackupEpochMillis > 0L &&
+        System.currentTimeMillis() - backup.lastVerifiedBackupEpochMillis < 30L * 24L * 60L * 60L * 1000L
     val protectedCount = listOf(
         vault.biometric && biometricReady,
         !vault.screenshots,
@@ -64,7 +66,8 @@ internal fun SecurityCenterScreen(
         recoveryKeyConfigured,
         vault.clipboardClearSeconds <= 30,
         automaticTime,
-        vault.hideCodes && vault.reauthOnReveal
+        vault.hideCodes && vault.reauthOnReveal,
+        recentlyVerified
     ).count { it }
 
     Column(
@@ -84,7 +87,7 @@ internal fun SecurityCenterScreen(
                     Column {
                         Text("Centro de seguridad", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            "$protectedCount de 9 protecciones recomendadas activas",
+                            "$protectedCount de 10 protecciones recomendadas activas",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -170,6 +173,16 @@ internal fun SecurityCenterScreen(
                 else -> "Usa copia local .cheto o conecta Drive"
             },
             backup.driveEnabled
+        )
+        SecurityStatus(
+            Icons.Rounded.Backup,
+            "Prueba de recuperación",
+            if (recentlyVerified) {
+                "Copia verificada recientemente sin alterar la bóveda"
+            } else {
+                "Verifica una copia desde Backup para confirmar que la contraseña funciona"
+            },
+            recentlyVerified
         )
         SecurityStatus(
             Icons.Rounded.Lock,
