@@ -3,7 +3,7 @@
   "authorization_user_agent": "WEBVIEW",
   "redirect_uri": "msauth://com.cmcorpusg.chetoauthenticator/placeholder",
   "broker_redirect_uri_registered": false,
-  "account_mode": "SINGLE",
+  "account_mode": "MULTIPLE",
   "authorities": [
     {
       "type": "AAD",
