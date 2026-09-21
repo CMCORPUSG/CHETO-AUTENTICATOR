@@ -37,11 +37,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.cmcorpusg.chetoauthenticator.backup.BackupScheduler
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 
 @Composable
-internal fun BackupPage(busy: Boolean, action: (String) -> Unit) {
+internal fun BackupPage(
+    busy: Boolean,
+    action: (String) -> Unit,
+    onDisableAuto: ((() -> Unit)) -> Unit
+) {
     val context = LocalContext.current
     val settings = remember { BackupSettings(context) }
     var automatic by remember { mutableStateOf(settings.driveEnabled) }
@@ -98,7 +101,7 @@ internal fun BackupPage(busy: Boolean, action: (String) -> Unit) {
         )
         if (automatic) {
             OutlinedButton(
-                onClick = { settings.driveEnabled = false; BackupScheduler.disable(context); automatic = false },
+                onClick = { onDisableAuto { automatic = false } },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth().height(43.dp),
                 shape = ControlShape
