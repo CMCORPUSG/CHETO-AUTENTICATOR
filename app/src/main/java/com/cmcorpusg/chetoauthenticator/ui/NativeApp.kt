@@ -39,6 +39,10 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -80,15 +84,16 @@ fun NativeApp(
             if(vault==null){LoginScreen(exists,onLogin,onRegister,onBiometric,onMessage);return@Surface}
             var page by remember { mutableStateOf("Inicio") }
             var editor by remember { mutableStateOf<MobileAccount?>(null) }
+            var addAccount by remember { mutableStateOf(false) }
             var delete by remember { mutableStateOf<MobileAccount?>(null) }
             var backupMode by remember { mutableStateOf<String?>(null) }
             var changePin by remember { mutableStateOf(false) }
             var manageCategories by remember { mutableStateOf(false) }
             var clockMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
             LaunchedEffect(Unit){ while(true){ clockMillis=System.currentTimeMillis(); delay(30_000) } }
-            LaunchedEffect(scanned){if(scanned!=null){editor=scanned;onScannedConsumed()}}
+            LaunchedEffect(scanned){if(scanned!=null){addAccount=false;editor=scanned;onScannedConsumed()}}
             LaunchedEffect(stagedPhoto){if(stagedPhoto!=null&&editor!=null){editor=editor!!.copy(photo=stagedPhoto);onPhotoConsumed()}}
-            BackHandler { when { editor!=null->editor=null;manageCategories->manageCategories=false;page!="Inicio"->page="Inicio";else->onLock() } }
+            BackHandler { when { editor!=null->editor=null;addAccount->addAccount=false;manageCategories->manageCategories=false;page!="Inicio"->page="Inicio";else->onLock() } }
             Scaffold(
                 topBar={
                     Column(
@@ -123,19 +128,24 @@ fun NativeApp(
                             label={Text(label)}
                         )
                     }
-                }},floatingActionButton={if(page=="Inicio"&&!manageCategories)FloatingActionButton(onClick={editor=MobileAccount()},containerColor=Blue,contentColor=Color.White,shape=RoundedCornerShape(17.dp)){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
+                }},floatingActionButton={if(page=="Inicio"&&!manageCategories)FloatingActionButton(onClick={addAccount=true},containerColor=Blue,contentColor=Color.White,shape=RoundedCornerShape(17.dp)){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
             ){padding->
                 Column(Modifier.padding(padding).fillMaxSize()){
                     if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
                     if(manageCategories){Categories(vault,onUpdate,{manageCategories=false},onMessage)}
                     else when(page){
-                        "Inicio"->Accounts(vault,onCopy,{editor=it},{delete=it},onScan,{manageCategories=true})
+                        "Inicio"->HomeScreen(vault,onCopy,{editor=it},{delete=it},{manageCategories=true})
                         "Backup"->BackupScreen(busy){backupMode=it}
                         "Perfil"->ProfileScreen(vault,onUpdate,{onPhoto(null)},onMessage)
                         "Ajustes"->SettingsScreen(vault,onUpdate,{manageCategories=true},{changePin=true})
                     }
                 }
             }
+            if(addAccount)AddAccountScreen(
+                onDismiss={addAccount=false},
+                onScan={photo->addAccount=false;onScan(photo)},
+                onManual={account->addAccount=false;editor=account}
+            )
             editor?.let { account->AccountEditor(account,vault.categories,onPhoto={onPhoto(account.id)},onDismiss={editor=null},onSave={a->
                 onUpdate(vault.copy(accounts=if(vault.accounts.any { it.id==a.id })vault.accounts.map { if(it.id==a.id)a else it } else vault.accounts+a));editor=null
             },onMessage=onMessage) }
@@ -497,85 +507,83 @@ private fun categoryColorHex(name:String,overrides:Map<String,String>):String{
     return keys[(name.hashCode() and Int.MAX_VALUE)%keys.size]
 }
 
-private fun categoryColor(name:String,overrides:Map<String,String>):Color =
+internal fun categoryColor(name:String,overrides:Map<String,String>):Color =
     categoryPalette[categoryColorHex(name,overrides)] ?: Blue
 
 @Composable private fun AccountEditor(initial:MobileAccount,categories:List<String>,onPhoto:()->Unit,onDismiss:()->Unit,onSave:(MobileAccount)->Unit,onMessage:(String)->Unit){
-    var a by remember(initial.id) { mutableStateOf(initial) }
+    var a by remember(initial.id){mutableStateOf(initial)}
     var period by remember(initial.id){mutableStateOf(initial.period.toString())}
-    var logoDomain by remember(initial.id){ mutableStateOf(ServiceCatalog.domainFor(initial.issuer).orEmpty()) }
+    var logoDomain by remember(initial.id){mutableStateOf(ServiceCatalog.domainFor(initial.issuer).orEmpty())}
     LaunchedEffect(initial.photo){a=a.copy(photo=initial.photo)}
     androidx.compose.ui.window.Dialog(onDismissRequest=onDismiss,properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)){
         Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background){
-            Column(Modifier.safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-                Text("Cuenta TOTP",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                    Avatar(a.issuer,a.photo)
-                    Column(Modifier.weight(1f)){
-                        Text(a.issuer.ifBlank{"Servicio"},fontWeight=FontWeight.Bold)
-                        Text(
-                            if(a.photo.isBlank())"Logo automático al guardar" else "Logo configurado",
-                            style=MaterialTheme.typography.bodySmall
-                        )
+            Column(Modifier.safeDrawingPadding().imePadding()){
+                Row(Modifier.fillMaxWidth().padding(horizontal=10.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){
+                    IconButton(onClick=onDismiss){Icon(Icons.AutoMirrored.Rounded.ArrowBack,"Volver")}
+                    Column{
+                        Text(if(initial.issuer.isBlank())"Cuenta manual" else "Editar cuenta",style=MaterialTheme.typography.headlineSmall)
+                        Text("Identidad y configuración TOTP",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Field("Servicio",a.issuer,{value->
-                    a=a.copy(issuer=value)
-                    if(logoDomain.isBlank())logoDomain=ServiceCatalog.domainFor(value).orEmpty()
-                })
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement=Arrangement.spacedBy(8.dp)
-                ){
-                    ServiceCatalog.suggestions.forEach { service->
-                        AssistChip(
-                            onClick={
-                                a=a.copy(
-                                    issuer=service,
-                                    photo=ServiceCatalog.logoUrlFor(service).orEmpty()
-                                )
-                                logoDomain=ServiceCatalog.domainFor(service).orEmpty()
-                            },
-                            label={Text(service)}
-                        )
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=18.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(13.dp)){
+                    Card(Modifier.fillMaxWidth(),shape=CardShape,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
+                        Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)){
+                            Avatar(a.issuer.ifBlank{"CH"},a.photo,60)
+                            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)){
+                                Text(a.issuer.ifBlank{"Nuevo servicio"},style=MaterialTheme.typography.titleLarge)
+                                Text(a.label.ifBlank{"Configura la identidad de la cuenta"},style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1)
+                                if(a.photo.isNotBlank())Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                                    Icon(Icons.Rounded.CheckCircle,null,Modifier.size(14.dp),tint=ChetoSuccess)
+                                    Text("Logo listo",style=MaterialTheme.typography.labelSmall,color=ChetoSuccess)
+                                }
+                            }
+                        }
                     }
+
+                    SectionHeader("Servicio y logo")
+                    Field("Nombre del servicio",a.issuer,{value->a=a.copy(issuer=value);if(logoDomain.isBlank())logoDomain=ServiceCatalog.domainFor(value).orEmpty()})
+                    Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp)){
+                        ServiceCatalog.suggestions.take(10).forEach{service->
+                            AssistChip(onClick={a=a.copy(issuer=service,photo=ServiceCatalog.logoUrlFor(service).orEmpty());logoDomain=ServiceCatalog.domainFor(service).orEmpty()},label={Text(service)})
+                        }
+                    }
+                    PremiumCard(Modifier.fillMaxWidth()){
+                        Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                            Field("Dominio del logo",logoDomain,{logoDomain=it.trim()})
+                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                OutlinedButton(onClick={
+                                    val url=ServiceCatalog.logoUrlFor(logoDomain.ifBlank{a.issuer})
+                                    if(url==null)onMessage("Escribe un servicio o dominio válido")else{a=a.copy(photo=url);onMessage("Logo online seleccionado")}
+                                },modifier=Modifier.weight(1f).height(42.dp),shape=ControlShape,contentPadding=PaddingValues(horizontal=8.dp)){Text("Buscar logo online",maxLines=1,style=MaterialTheme.typography.labelMedium)}
+                                OutlinedButton(onClick=onPhoto,modifier=Modifier.weight(1f).height(42.dp),shape=ControlShape,contentPadding=PaddingValues(horizontal=8.dp)){Text("Subir logo",maxLines=1)}
+                            }
+                        }
+                    }
+
+                    SectionHeader("Datos de la cuenta")
+                    Field("Cuenta o correo",a.label,{a=a.copy(label=it)})
+                    Field("Clave secreta Base32",a.secret,{a=a.copy(secret=it)},password=true)
+                    Choice("Categoría",a.category,categories){a=a.copy(category=it)}
+                    Field("Notas (opcional)",a.notes,{a=a.copy(notes=it)},singleLine=false)
+
+                    SectionHeader("Configuración avanzada")
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        Box(Modifier.weight(1f)){Choice("Dígitos",a.digits.toString(),listOf("6","7","8")){a=a.copy(digits=it.toInt())}}
+                        Box(Modifier.weight(1f)){Choice("Algoritmo",a.algorithm,listOf("SHA1","SHA256","SHA512")){a=a.copy(algorithm=it)}}
+                    }
+                    Field("Periodo (segundos)",period,{period=it.filter(Char::isDigit).take(3)},keyboard=KeyboardType.Number)
+                    Spacer(Modifier.height(2.dp))
+                    Button(onClick={
+                        val normalized=a.secret.uppercase().replace(Regex("[\\s=-]"),"")
+                        val p=period.toIntOrNull()
+                        if(p==null||p !in 1..300||a.issuer.isBlank())onMessage("Completa el servicio y un periodo entre 1 y 300")
+                        else runCatching{TotpEngine.generate(normalized,digits=a.digits,period=p,algorithm=a.algorithm)}.onSuccess{
+                            val issuer=a.issuer.trim();onSave(a.copy(secret=normalized,period=p,issuer=issuer,label=a.label.trim().ifBlank{"Sin etiqueta"},photo=a.photo.ifBlank{ServiceCatalog.logoUrlFor(issuer).orEmpty()}))
+                        }.onFailure{onMessage("Clave Base32 inválida. Copia la clave del servicio.")}
+                    },modifier=Modifier.fillMaxWidth().height(46.dp),shape=ControlShape){Text("Guardar cuenta")}
+                    OutlinedButton(onClick=onDismiss,modifier=Modifier.fillMaxWidth().height(44.dp),shape=ControlShape){Text("Cancelar")}
+                    Spacer(Modifier.height(12.dp))
                 }
-                Field("Dominio para logo (opcional)",logoDomain,{logoDomain=it.trim()})
-                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    OutlinedButton(
-                        onClick={
-                            val source=logoDomain.ifBlank{a.issuer}
-                            val url=ServiceCatalog.logoUrlFor(source)
-                            if(url==null)onMessage("Escribe un servicio o dominio válido")
-                            else {a=a.copy(photo=url);onMessage("Logo online seleccionado")}
-                        },
-                        modifier=Modifier.weight(1f)
-                    ){Text("Buscar logo")}
-                    OutlinedButton(onClick=onPhoto,modifier=Modifier.weight(1f)){Text("Logo local")}
-                }
-                Field("Cuenta o correo",a.label,{a=a.copy(label=it)})
-                Field("Clave secreta Base32",a.secret,{a=a.copy(secret=it)},password=true)
-                Choice("Categoría",a.category,categories){a=a.copy(category=it)}
-                Field("Notas",a.notes,{a=a.copy(notes=it)},singleLine=false)
-                Choice("Dígitos",a.digits.toString(),listOf("6","7","8")){a=a.copy(digits=it.toInt())}
-                Field("Periodo en segundos",period,{period=it.filter(Char::isDigit).take(3)},keyboard=KeyboardType.Number)
-                Choice("Algoritmo",a.algorithm,listOf("SHA1","SHA256","SHA512")){a=a.copy(algorithm=it)}
-                Button(onClick={
-                    val normalized=a.secret.uppercase().replace(Regex("[\\s=-]"),"")
-                    val p=period.toIntOrNull()
-                    if(p==null||p !in 1..300||a.issuer.isBlank())onMessage("Completa el servicio y un periodo entre 1 y 300")
-                    else runCatching { TotpEngine.generate(normalized,digits=a.digits,period=p,algorithm=a.algorithm) }.onSuccess {
-                        val issuer=a.issuer.trim()
-                        onSave(a.copy(
-                            secret=normalized,
-                            period=p,
-                            issuer=issuer,
-                            label=a.label.trim().ifBlank{"Sin etiqueta"},
-                            photo=a.photo.ifBlank { ServiceCatalog.logoUrlFor(issuer).orEmpty() }
-                        ))
-                    }.onFailure { onMessage("Clave Base32 inválida. Copia la clave del servicio.") }
-                },modifier=Modifier.fillMaxWidth()){Text("Guardar cuenta")}
-                OutlinedButton(onClick=onDismiss,modifier=Modifier.fillMaxWidth()){Text("Cancelar")}
             }
         }
     }
@@ -1060,15 +1068,16 @@ private fun categoryColor(name:String,overrides:Map<String,String>):Color =
 @Composable private fun Panel(title:String,description:String){Card(Modifier.fillMaxWidth()){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(title,fontWeight=FontWeight.Bold);Text(description,style=MaterialTheme.typography.bodyMedium)}}}
 @Composable private fun Field(label:String,value:String,onChange:(String)->Unit,password:Boolean=false,keyboard:KeyboardType=KeyboardType.Text,singleLine:Boolean=true){
     OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},modifier=Modifier.fillMaxWidth(),singleLine=singleLine,
-        visualTransformation=if(password)PasswordVisualTransformation() else VisualTransformation.None,keyboardOptions=KeyboardOptions(keyboardType=keyboard),shape=RoundedCornerShape(15.dp))
+        visualTransformation=if(password)PasswordVisualTransformation() else VisualTransformation.None,keyboardOptions=KeyboardOptions(keyboardType=keyboard),shape=ControlShape,
+        colors=OutlinedTextFieldDefaults.colors(unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant))
 }
 @Composable private fun Choice(label:String,value:String,values:List<String>,onChange:(String)->Unit){
     var expanded by remember{mutableStateOf(false)}
-    Box{OutlinedButton(onClick={expanded=true},modifier=Modifier.fillMaxWidth()){Text("$label: $value ▾")}
+    Box{OutlinedButton(onClick={expanded=true},modifier=Modifier.fillMaxWidth().height(48.dp),shape=ControlShape){Text("$label: $value ▾",maxLines=1)}
         DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}){values.forEach { item->DropdownMenuItem(text={Text(item)},onClick={onChange(item);expanded=false}) }}
     }
 }
-@Composable private fun Avatar(name:String,photo:String){
+@Composable internal fun Avatar(name:String,photo:String,size:Int=48){
     val bitmap=remember(photo){
         runCatching {
             if(photo.startsWith("data:image/")){
@@ -1082,7 +1091,7 @@ private fun categoryColor(name:String,overrides:Map<String,String>):Color =
             ?: ServiceCatalog.logoUrlFor(name)
     }
     Box(
-        Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(Blue),
+        Modifier.size(size.dp).clip(RoundedCornerShape((size/3).dp)).background(Blue),
         contentAlignment=Alignment.Center
     ){
         Text(name.take(2).uppercase().ifBlank{"CH"},color=Color.White,fontWeight=FontWeight.Bold)
