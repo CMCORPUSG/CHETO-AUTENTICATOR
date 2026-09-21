@@ -63,7 +63,8 @@ class NativeVaultBackupInstrumentedTest {
             biometric = true,
             screenshots = false,
             lockTimeoutSeconds = 60,
-            clipboardClearSeconds = 15
+            clipboardClearSeconds = 15,
+            reauthOnReveal = true
         )
 
         val encrypted = NativeVault.export(source, password)
@@ -86,6 +87,7 @@ class NativeVaultBackupInstrumentedTest {
         assertEquals(localDevice.screenshots, restored.screenshots)
         assertEquals(localDevice.lockTimeoutSeconds, restored.lockTimeoutSeconds)
         assertEquals(localDevice.clipboardClearSeconds, restored.clipboardClearSeconds)
+        assertEquals(localDevice.reauthOnReveal, restored.reauthOnReveal)
     }
 
     @Test
