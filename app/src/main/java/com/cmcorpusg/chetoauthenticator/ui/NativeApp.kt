@@ -74,8 +74,8 @@ private val Purple=ChetoViolet
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeApp(
-    vault:MobileVault?,exists:Boolean,busy:Boolean,scanned:MobileAccount?,stagedPhoto:String?,
-    onLogin:(String)->Unit,onRegister:(String,String,String)->Unit,onBiometric:()->Unit,
+    vault:MobileVault?,exists:Boolean,busy:Boolean,scanned:MobileAccount?,stagedPhoto:String?,biometricReady:Boolean,
+    onLogin:(String)->Unit,onRegister:(String,String,String)->Unit,onBiometric:()->Unit,onBiometricSetup:()->Unit,
     onUpdate:(MobileVault)->Unit,onScan:(Boolean)->Unit,onScannedConsumed:()->Unit,onCopy:(String)->Unit,
     onBackup:(String,String)->Unit,onPhoto:(String?)->Unit,onPhotoConsumed:()->Unit,onLock:()->Unit,onMessage:(String)->Unit
 ){
@@ -137,7 +137,7 @@ fun NativeApp(
                         "Inicio"->HomeScreen(vault,onCopy,{editor=it},{delete=it},{manageCategories=true})
                         "Backup"->BackupPage(busy){backupMode=it}
                         "Perfil"->UserProfileScreen(vault,onUpdate,{onPhoto(null)},onMessage)
-                        "Ajustes"->SettingsPage(vault,onUpdate,{manageCategories=true},{changePin=true})
+                        "Ajustes"->SettingsPage(vault,biometricReady,onUpdate,{manageCategories=true},{changePin=true},onBiometricSetup)
                     }
                 }
             }
