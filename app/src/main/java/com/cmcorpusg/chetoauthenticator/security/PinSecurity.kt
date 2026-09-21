@@ -14,7 +14,12 @@ object PinSecurity {
         require(pin.matches(Regex("\\d{6}"))) { "PIN must contain exactly 6 digits" }
         val salt = ByteArray(16).also(SecureRandom()::nextBytes)
         val hash = derive(pin, salt, ITERATIONS)
-        return "$PREFIX\\$${ITERATIONS}\\$${salt.toHex()}\\$${hash.toHex()}"
+        return listOf(
+            PREFIX,
+            ITERATIONS.toString(),
+            salt.toHex(),
+            hash.toHex()
+        ).joinToString("$")
     }
 
     fun verify(pin: String, stored: String): Boolean {
@@ -38,7 +43,7 @@ object PinSecurity {
         }.getOrDefault(false)
     }
 
-    fun isEncoded(value: String): Boolean = value.startsWith("$PREFIX$")
+    fun isEncoded(value: String): Boolean = value.startsWith(PREFIX + "$")
 
     private fun derive(pin: String, salt: ByteArray, iterations: Int): ByteArray {
         val spec = PBEKeySpec(pin.toCharArray(), salt, iterations, KEY_BITS)
