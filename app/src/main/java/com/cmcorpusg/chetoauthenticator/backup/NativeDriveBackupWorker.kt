@@ -43,12 +43,19 @@ class NativeDriveBackupWorker(
             }
 
             val plain = NativeVault.exportPortableJson(vaultStore.read())
+            val fingerprint = BackupContentFingerprint.sha256(plain)
+            if (settings.lastGoogleContentHash == fingerprint) {
+                settings.lastError = null
+                return@withContext Result.success()
+            }
+
             val encrypted = BackupCrypto.encrypt(plain, key, salt)
             DriveBackupClient("cheto_native_backup_").upload(
                 authResult.accessToken!!,
                 encrypted
             )
 
+            settings.lastGoogleContentHash = fingerprint
             settings.lastBackupEpochMillis = System.currentTimeMillis()
             settings.lastError = null
             Result.success()
