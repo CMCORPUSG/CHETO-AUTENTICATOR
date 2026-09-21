@@ -83,6 +83,7 @@ internal fun HomeScreen(
     onBulkCategory: (Set<String>, String) -> Unit,
     onBulkFavorite: (Set<String>, Boolean) -> Unit,
     onBulkExport: (Set<String>) -> Unit,
+    onRevealProtected: (() -> Unit) -> Unit,
     onCategories: () -> Unit
 ) {
     val context = LocalContext.current
@@ -359,7 +360,14 @@ internal fun HomeScreen(
                         selectedIds + account.id
                     }
                 },
-                onCodeClick = { if (vault.hideCodes) revealed = account.id else onCopy(code) },
+                onCodeClick = {
+                    if (vault.hideCodes) {
+                        val reveal = { revealed = account.id }
+                        if (vault.reauthOnReveal) onRevealProtected(reveal) else reveal()
+                    } else {
+                        onCopy(code)
+                    }
+                },
                 onCopy = { onCopy(code) },
                 onFavorite = { onToggleFavorite(account) },
                 onEdit = { onEdit(account) },
