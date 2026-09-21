@@ -47,7 +47,8 @@ data class MobileVault(
     val categoryColors: Map<String, String> = emptyMap(),
     val lockTimeoutSeconds: Int = 0,
     val linkedIdentities: List<LinkedIdentity> = emptyList(),
-    val trash: List<TrashedAccount> = emptyList()
+    val trash: List<TrashedAccount> = emptyList(),
+    val clipboardClearSeconds: Int = 30
 )
 
 class NativeVault(context: Context) {
@@ -155,7 +156,7 @@ class NativeVault(context: Context) {
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
-        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 8).put("pin", s.pin)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 9).put("pin", s.pin)
             .put(
                 "profile",
                 JSONObject()
@@ -205,6 +206,7 @@ class NativeVault(context: Context) {
                     .put("biometric", s.biometric)
                     .put("screenshots", s.screenshots)
                     .put("lockTimeoutSeconds", s.lockTimeoutSeconds)
+                    .put("clipboardClearSeconds", s.clipboardClearSeconds)
             )
             .put(
                 "accounts",
@@ -345,7 +347,9 @@ class NativeVault(context: Context) {
                 categoryColors,
                 settings.optInt("lockTimeoutSeconds", 0).takeIf { it in setOf(0, 30, 60, 300) } ?: 0,
                 linkedIdentities,
-                trash
+                trash,
+                settings.optInt("clipboardClearSeconds", 30)
+                    .takeIf { it in setOf(15, 30, 60, 120) } ?: 30
             )
         }
 
