@@ -1,0 +1,6 @@
+# Copy only the values you need to your LOCAL Gradle properties.
+# Recommended: %USERPROFILE%\.gradle\gradle.properties
+# Do not commit secrets or client secrets.
+
+CHETO_GOOGLE_WEB_CLIENT_ID=
+CHETO_MICROSOFT_CLIENT_ID=
