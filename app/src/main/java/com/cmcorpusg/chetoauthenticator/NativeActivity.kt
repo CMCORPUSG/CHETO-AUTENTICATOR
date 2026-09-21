@@ -625,8 +625,16 @@ class NativeActivity : FragmentActivity() {
             "restoreMerge"->{pendingRestoreMode="merge";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
             "driveRestore"->drive { token -> work("Copia de Drive restaurada") {
                 val data=DriveBackupClient("cheto_native_backup_").downloadLatest(token)?:error("Sin copias")
-                val restored=NativeVault.restore(data,password,current);store.write(restored)
+                val restored=NativeVault.restore(data,password,current)
+                store.write(restored)
                 withContext(Dispatchers.Main){if(vault!=null)vault=restored}
+            } }
+            "driveRestoreMerge"->drive { token -> work("Copia de Drive fusionada") {
+                val data=DriveBackupClient("cheto_native_backup_").downloadLatest(token)?:error("Sin copias")
+                val restored=NativeVault.restore(data,password,current)
+                val merged=mergeRestoredVault(current,restored)
+                store.write(merged)
+                withContext(Dispatchers.Main){if(vault!=null)vault=merged}
             } }
             else->work(if(mode=="export")"Elige dónde guardar la copia" else "Copia preparada") {
                 val payload=NativeVault.export(current,password)
