@@ -4,7 +4,7 @@ plugins {
 }
 
 fun String.asBuildConfigString(): String =
-    """ + replace("\\", "\\\\").replace(""", "\\"") + """
+    "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 val googleWebClientId = providers.gradleProperty("CHETO_GOOGLE_WEB_CLIENT_ID").orElse("").get()
 val microsoftClientId = providers.gradleProperty("CHETO_MICROSOFT_CLIENT_ID").orElse("").get()
