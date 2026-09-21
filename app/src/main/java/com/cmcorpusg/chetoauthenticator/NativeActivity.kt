@@ -2,10 +2,13 @@ package com.cmcorpusg.chetoauthenticator
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.setContent
@@ -49,6 +52,17 @@ class NativeActivity : FragmentActivity() {
     private var pendingDrive: ((String) -> Unit)? = null
     private var photoAccount: String? = null
     private var stagedPhoto by mutableStateOf<String?>(null)
+    private var biometricReady by mutableStateOf(false)
+    private var pendingBiometricEnable = false
+    private val enrollBiometric = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        external=false
+        if(pendingBiometricEnable){
+            pendingBiometricEnable=false
+            refreshBiometricReady()
+            if(biometricReady) confirmBiometricEnrollment()
+            else message("No se registró una biometría compatible. Puedes seguir usando tu PIN.")
+        }
+    }
     private val saveFile = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         external=false
         val payload=pendingExport; pendingExport=null
@@ -112,9 +126,9 @@ class NativeActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        store=NativeVault(this);exists=store.exists()
+        store=NativeVault(this);exists=store.exists();refreshBiometricReady()
         setContent {
-            NativeApp(vault,exists,busy,scanned,stagedPhoto,
+            NativeApp(vault,exists,busy,scanned,stagedPhoto,biometricReady,
                 onLogin={ pin -> runCatching { store.unlock(pin) }.onSuccess { vault=it;applySettings(it) }.onFailure { message(it.message?:"No se pudo abrir el perfil") } },
                 onRegister={ name,email,pin ->
                     if(!store.exists())runCatching {
@@ -123,7 +137,7 @@ class NativeActivity : FragmentActivity() {
                         store.read()
                     }.onSuccess { persisted->vault=persisted;exists=true }
                         .onFailure { message("No se pudo guardar el perfil") }
-                },onBiometric=::biometric,onUpdate=::update,
+                },onBiometric=::biometric,onBiometricSetup=::requestBiometricSetup,onUpdate=::update,
                 onScan={ photo -> external=true;if(photo)pickQr.launch("image/*") else GmsBarcodeScanning.getClient(this).startScan()
                     .addOnSuccessListener { it.rawValue?.let(::receiveQr) }.addOnFailureListener { message("Escáner no disponible. Usa una imagen o la clave manual.") }
                     .addOnCompleteListener { external=false } },
@@ -132,6 +146,7 @@ class NativeActivity : FragmentActivity() {
                 onPhotoConsumed={stagedPhoto=null},onLock={vault=null;scanned=null},onMessage=::message)
         }
     }
+    override fun onResume(){super.onResume();if(::store.isInitialized)refreshBiometricReady()}
     override fun onStop(){super.onStop();if(!external){vault=null;scanned=null;stagedPhoto=null;window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)}}
     private fun message(value: String){Toast.makeText(this,value,Toast.LENGTH_LONG).show()}
     private fun applySettings(s: MobileVault){if(s.screenshots)window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) else window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)}
@@ -174,15 +189,111 @@ class NativeActivity : FragmentActivity() {
         clipboard.setPrimaryClip(clip);message("Código copiado")
         lifecycleScope.launch { kotlinx.coroutines.delay(30_000);if(clipboard.primaryClip?.getItemAt(0)?.text?.toString()==value)clipboard.setPrimaryClip(ClipData.newPlainText("","")) }
     }
-    private fun biometric(){
-        if(!exists)return
-        if(runCatching { !store.read().biometric }.getOrDefault(true)){message("Usa tu PIN");return}
-        if(BiometricManager.from(this).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)!=BiometricManager.BIOMETRIC_SUCCESS){message("Configura una huella compatible en Android o usa tu PIN");return}
+    private fun refreshBiometricReady(){
+        biometricReady=BiometricManager.from(this)
+            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)==BiometricManager.BIOMETRIC_SUCCESS
+    }
+
+    private fun requestBiometricSetup(){
+        when(BiometricManager.from(this).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)){
+            BiometricManager.BIOMETRIC_SUCCESS -> confirmBiometricEnrollment()
+            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> launchBiometricEnrollment()
+            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> message("Este dispositivo no tiene biometría compatible.")
+            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> message("El sensor biométrico no está disponible ahora. Intenta nuevamente.")
+            else -> message("Android no permite usar biometría en este momento. Puedes continuar con tu PIN.")
+        }
+    }
+
+    private fun launchBiometricEnrollment(){
+        val intent=when{
+            Build.VERSION.SDK_INT>=Build.VERSION_CODES.R -> Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
+                putExtra(
+                    Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG
+                )
+            }
+            Build.VERSION.SDK_INT>=Build.VERSION_CODES.P -> Intent(Settings.ACTION_FINGERPRINT_ENROLL)
+            else -> Intent(Settings.ACTION_SECURITY_SETTINGS)
+        }
+        if(intent.resolveActivity(packageManager)==null){
+            message("Abre Ajustes de Android y registra una huella para continuar.")
+            return
+        }
+        pendingBiometricEnable=true
+        external=true
+        enrollBiometric.launch(intent)
+    }
+
+    private fun confirmBiometricEnrollment(){
         external=true
         BiometricPrompt(this,ContextCompat.getMainExecutor(this),object:BiometricPrompt.AuthenticationCallback(){
-            override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult){external=false;runCatching { store.read() }.onSuccess { vault=it;applySettings(it) }.onFailure { message("No se pudo abrir el perfil") }}
+            override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult){
+                external=false
+                biometricReady=true
+                runCatching {
+                    val current=store.read()
+                    store.write(current.copy(biometric=true))
+                    store.read()
+                }.onSuccess { persisted->
+                    vault=persisted
+                    applySettings(persisted)
+                    message("Biometría activada en CHETO")
+                }.onFailure { message("No se pudo activar la biometría") }
+            }
+            override fun onAuthenticationError(code:Int,text:CharSequence){
+                external=false
+                refreshBiometricReady()
+                message("Biometría no activada. Puedes continuar con tu PIN.")
+            }
+            override fun onAuthenticationFailed(){
+                message("Huella no reconocida. Intenta nuevamente.")
+            }
+        }).authenticate(
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Activar biometría en CHETO")
+                .setSubtitle("Confirma tu huella para habilitar el acceso biométrico")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                .setNegativeButtonText("Cancelar")
+                .build()
+        )
+    }
+
+    private fun biometric(){
+        if(!exists)return
+        val enabled=runCatching { store.read().biometric }.getOrDefault(false)
+        if(!enabled){
+            requestBiometricSetup()
+            return
+        }
+        when(BiometricManager.from(this).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)){
+            BiometricManager.BIOMETRIC_SUCCESS -> Unit
+            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
+                requestBiometricSetup()
+                return
+            }
+            else -> {
+                message("La biometría no está disponible. Usa tu PIN.")
+                return
+            }
+        }
+        external=true
+        BiometricPrompt(this,ContextCompat.getMainExecutor(this),object:BiometricPrompt.AuthenticationCallback(){
+            override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult){
+                external=false
+                runCatching { store.read() }
+                    .onSuccess { vault=it;applySettings(it) }
+                    .onFailure { message("No se pudo abrir el perfil") }
+            }
             override fun onAuthenticationError(code:Int,text:CharSequence){external=false;message("Puedes entrar con tu PIN")}
-        }).authenticate(BiometricPrompt.PromptInfo.Builder().setTitle("CHETO Authenticator").setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG).setNegativeButtonText("Usar PIN").build())
+            override fun onAuthenticationFailed(){message("Huella no reconocida")}
+        }).authenticate(
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("CHETO Authenticator")
+                .setSubtitle("Confirma tu identidad")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                .setNegativeButtonText("Usar PIN")
+                .build()
+        )
     }
     private fun drive(action:(String)->Unit){
         val request=AuthorizationRequest.builder().setRequestedScopes(listOf(Scope("https://www.googleapis.com/auth/drive.appdata"))).build()
