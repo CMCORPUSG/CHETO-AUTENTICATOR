@@ -16,6 +16,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Star
@@ -46,6 +49,11 @@ internal fun UserProfileScreen(
     vault: MobileVault,
     onUpdate: (MobileVault) -> Unit,
     onPhoto: () -> Unit,
+    googleConfigured: Boolean,
+    microsoftConfigured: Boolean,
+    onLinkGoogle: () -> Unit,
+    onLinkMicrosoft: () -> Unit,
+    onUnlinkIdentity: (String, String) -> Unit,
     onMessage: (String) -> Unit
 ) {
     var name by remember(vault.name) { mutableStateOf(vault.name) }
@@ -85,6 +93,94 @@ internal fun UserProfileScreen(
                 }
             }
         }
+
+        SectionHeader("Identidad vinculada", "Conecta proveedores sin guardar contraseñas ni tokens en la bóveda")
+        PremiumCard(Modifier.fillMaxWidth()) {
+            Column {
+                if (vault.linkedIdentities.isEmpty()) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(15.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("Aún no hay proveedores vinculados", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Vincular una cuenta permite identificar el correo y nombre del proveedor. Los tokens de sesión no se guardan dentro de CHETO.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    vault.linkedIdentities.forEachIndexed { index, identity ->
+                        val providerName = if (identity.provider == "google") "Google" else "Microsoft"
+                        val providerLogo = ServiceCatalog.logoUrlFor(providerName).orEmpty()
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(11.dp)
+                        ) {
+                            Avatar(providerName, identity.photo.ifBlank { providerLogo }, 42)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Text(providerName, fontWeight = FontWeight.SemiBold)
+                                    Icon(
+                                        Icons.Rounded.CheckCircle,
+                                        contentDescription = "Cuenta vinculada",
+                                        tint = ChetoSuccess
+                                    )
+                                }
+                                Text(identity.email, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                                identity.displayName.takeIf { it.isNotBlank() }?.let {
+                                    Text(
+                                        it,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                            IconButton(
+                                onClick = { onUnlinkIdentity(identity.provider, identity.subject) }
+                            ) {
+                                Icon(Icons.Rounded.LinkOff, "Desvincular")
+                            }
+                        }
+                        if (index < vault.linkedIdentities.lastIndex) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onLinkGoogle,
+                modifier = Modifier.weight(1f).height(44.dp),
+                shape = ControlShape
+            ) {
+                Avatar("Google", ServiceCatalog.logoUrlFor("Google").orEmpty(), 24)
+                Text(if (googleConfigured) "  Google" else "  Configurar Google")
+            }
+            OutlinedButton(
+                onClick = onLinkMicrosoft,
+                modifier = Modifier.weight(1f).height(44.dp),
+                shape = ControlShape
+            ) {
+                Avatar("Microsoft", ServiceCatalog.logoUrlFor("Microsoft").orEmpty(), 24)
+                Text(if (microsoftConfigured) "  Microsoft" else "  Configurar Microsoft")
+            }
+        }
+        Text(
+            "La vinculación identifica tu cuenta del proveedor. Para seguridad de servidor, los ID tokens deben validarse fuera del dispositivo.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         SectionHeader("Correos", "Se guardan localmente en tu perfil")
         if (vault.emails.isNotEmpty()) {
