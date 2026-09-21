@@ -17,7 +17,7 @@ data class DriveBackupInfo(
 class DriveBackupClient(private val prefix: String = "cheto_backup_") {
     fun upload(accessToken: String, encryptedPayload: String) {
         val existing = listBackups(accessToken, 100)
-            .firstOrNull { it.name == FIXED_BACKUP_NAME }
+            .firstOrNull { it.name == fixedBackupName }
 
         if (existing != null) {
             val connection = open(
@@ -34,7 +34,7 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
         } else {
             val boundary = "cheto-${UUID.randomUUID()}"
             val metadata = JSONObject()
-                .put("name", FIXED_BACKUP_NAME)
+                .put("name", fixedBackupName)
                 .put("parents", org.json.JSONArray().put("appDataFolder"))
                 .toString()
 
@@ -101,7 +101,7 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
 
     private fun removeLegacyDuplicates(accessToken: String) {
         val files = listBackups(accessToken, 100)
-        files.filter { it.name != FIXED_BACKUP_NAME }.forEach { backup ->
+        files.filter { it.name != fixedBackupName }.forEach { backup ->
             val connection = open(
                 "https://www.googleapis.com/drive/v3/files/${backup.id}",
                 accessToken,
@@ -162,8 +162,10 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
         BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() }
             .also { connection.disconnect() }
 
+    private val fixedBackupName: String
+        get() = "${prefix}current.cheto"
+
     companion object {
         private const val MAX_BACKUPS = 7
-        private const val FIXED_BACKUP_NAME = "CHETO-BACKUP.cheto"
     }
 }
