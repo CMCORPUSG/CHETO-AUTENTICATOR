@@ -16,6 +16,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Screenshot
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Schedule
@@ -50,6 +51,7 @@ internal fun SettingsPage(
     onPin: () -> Unit,
     onBiometricSetup: () -> Unit,
     onSecurityCenter: () -> Unit,
+    onAbout: () -> Unit,
     onSensitiveAction: (String, () -> Unit) -> Unit
 ) {
     var showAutoLock by remember { mutableStateOf(false) }
@@ -132,8 +134,11 @@ internal fun SettingsPage(
             GroupDivider()
             ActionRow(Icons.Rounded.Category, "Categorías", "Organiza cuentas y colores", onCategories)
         }
+        SettingsGroup("Aplicación") {
+            ActionRow(Icons.Rounded.Info, "Acerca de y diagnóstico", "Versión, proveedores, dispositivo y privacidad", onAbout)
+        }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("CHETO Authenticator 0.11.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("CHETO Authenticator 0.12.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Android nativo · Kotlin + Compose", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
