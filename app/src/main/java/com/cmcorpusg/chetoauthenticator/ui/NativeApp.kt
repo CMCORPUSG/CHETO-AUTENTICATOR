@@ -66,6 +66,7 @@ import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.data.AccountPolicy
 import com.cmcorpusg.chetoauthenticator.data.MobileAccount
 import com.cmcorpusg.chetoauthenticator.data.MobileVault
+import com.cmcorpusg.chetoauthenticator.data.TrashedAccount
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 
@@ -102,6 +103,7 @@ fun NativeApp(
             var manageCategories by remember { mutableStateOf(false) }
             var securityCenter by remember { mutableStateOf(false) }
             var about by remember { mutableStateOf(false) }
+            var trashScreen by remember { mutableStateOf(false) }
             var critical by remember { mutableStateOf<PendingCriticalAction?>(null) }
             var clockMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
             LaunchedEffect(Unit){ while(true){ clockMillis=System.currentTimeMillis(); delay(30_000) } }
@@ -113,6 +115,7 @@ fun NativeApp(
                 manageCategories->manageCategories=false
                 securityCenter->securityCenter=false
                 about->about=false
+                trashScreen->trashScreen=false
                 page!="Inicio"->page="Inicio"
                 else->onLock()
             } }
@@ -134,6 +137,7 @@ fun NativeApp(
                                         manageCategories -> "Categorías"
                                         securityCenter -> "Centro de seguridad"
                                         about -> "Acerca de CHETO"
+                                        trashScreen -> "Papelera"
                                         else -> page
                                     },
                                     color=Color.White,
@@ -145,7 +149,7 @@ fun NativeApp(
                             IconButton(onClick=onLock){Icon(Icons.Rounded.Lock,contentDescription="Bloquear",tint=Color.White)}
                         }
                     }
-                },bottomBar={if(!manageCategories&&!securityCenter&&!about)NavigationBar(containerColor=MaterialTheme.colorScheme.surface,tonalElevation=3.dp) {
+                },bottomBar={if(!manageCategories&&!securityCenter&&!about&&!trashScreen)NavigationBar(containerColor=MaterialTheme.colorScheme.surface,tonalElevation=3.dp) {
                     val destinations=listOf(
                         Triple("Inicio",Icons.Rounded.Home,"Inicio"),
                         Triple("Backup",Icons.Rounded.Cloud,"Backup"),
@@ -160,7 +164,7 @@ fun NativeApp(
                             label={Text(label)}
                         )
                     }
-                }},floatingActionButton={if(page=="Inicio"&&!manageCategories&&!securityCenter&&!about)FloatingActionButton(onClick={addAccount=true},containerColor=Blue,contentColor=Color.White,shape=RoundedCornerShape(17.dp)){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
+                }},floatingActionButton={if(page=="Inicio"&&!manageCategories&&!securityCenter&&!about&&!trashScreen)FloatingActionButton(onClick={addAccount=true},containerColor=Blue,contentColor=Color.White,shape=RoundedCornerShape(17.dp)){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
             ){padding->
                 Column(Modifier.padding(padding).fillMaxSize()){
                     if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -172,6 +176,44 @@ fun NativeApp(
                             biometricReady=biometricReady,
                             googleConfigured=googleIdentityConfigured,
                             microsoftConfigured=microsoftIdentityConfigured
+                        )
+                        trashScreen -> TrashScreen(
+                            vault=vault,
+                            onRestore={ trashed->
+                                val duplicate=AccountPolicy.findDuplicate(trashed.account,vault.accounts)
+                                if(duplicate!=null){
+                                    onMessage("Ya existe una cuenta activa igual: ${duplicate.issuer} · ${duplicate.label}")
+                                }else{
+                                    onUpdate(
+                                        vault.copy(
+                                            accounts=vault.accounts+trashed.account,
+                                            trash=vault.trash.filterNot { it.account.id==trashed.account.id }
+                                        )
+                                    )
+                                }
+                            },
+                            onDeleteForever={ trashed->
+                                critical=PendingCriticalAction(
+                                    "Borrar definitivamente",
+                                    "Esta cuenta TOTP se eliminará de la bóveda y no podrá recuperarse desde la papelera."
+                                ){
+                                    onUpdate(
+                                        vault.copy(
+                                            trash=vault.trash.filterNot { it.account.id==trashed.account.id }
+                                        )
+                                    )
+                                }
+                            },
+                            onEmptyTrash={
+                                if(vault.trash.isNotEmpty()){
+                                    critical=PendingCriticalAction(
+                                        "Vaciar papelera",
+                                        "Se eliminarán definitivamente ${vault.trash.size} cuenta(s) TOTP."
+                                    ){
+                                        onUpdate(vault.copy(trash=emptyList()))
+                                    }
+                                }
+                            }
                         )
                         else -> when(page){
                             "Inicio"->HomeScreen(
@@ -196,12 +238,14 @@ fun NativeApp(
                                 onBulkDelete={ ids->
                                     if(ids.isNotEmpty()){
                                         critical=PendingCriticalAction(
-                                            "Eliminar ${ids.size} cuentas",
-                                            "Esta acción eliminará varias cuentas TOTP. Confirma tu identidad para continuar."
+                                            "Mover ${ids.size} cuentas a papelera",
+                                            "Las cuentas dejarán de aparecer en Inicio, pero podrás restaurarlas desde Ajustes → Papelera."
                                         ){
+                                            val moving=vault.accounts.filter { it.id in ids }
                                             onUpdate(
                                                 vault.copy(
-                                                    accounts=vault.accounts.filterNot { it.id in ids }
+                                                    accounts=vault.accounts.filterNot { it.id in ids },
+                                                    trash=vault.trash+moving.map { TrashedAccount(it) }
                                                 )
                                             )
                                         }
@@ -274,6 +318,7 @@ fun NativeApp(
                                 {changePin=true},
                                 onBiometricSetup,
                                 {securityCenter=true},
+                                {trashScreen=true},
                                 {about=true},
                                 {title,action->
                                     critical=PendingCriticalAction(
@@ -301,7 +346,23 @@ fun NativeApp(
                     editor=null
                 }
             },onMessage=onMessage) }
-            delete?.let { account->AlertDialog(onDismissRequest={delete=null},title={Text("Eliminar cuenta")},text={Text("¿Eliminar ${account.issuer} (${account.label})? Conserva una copia antes de eliminarla.")},confirmButton={TextButton(onClick={onUpdate(vault.copy(accounts=vault.accounts.filterNot { it.id==account.id }));delete=null}){Text("Eliminar")}},dismissButton={TextButton(onClick={delete=null}){Text("Cancelar")}}) }
+            delete?.let { account->AlertDialog(
+                onDismissRequest={delete=null},
+                title={Text("Mover a papelera")},
+                text={Text("¿Mover ${account.issuer} (${account.label}) a la papelera? Podrás restaurarla después.")},
+                confirmButton={
+                    TextButton(onClick={
+                        onUpdate(
+                            vault.copy(
+                                accounts=vault.accounts.filterNot { it.id==account.id },
+                                trash=vault.trash+TrashedAccount(account)
+                            )
+                        )
+                        delete=null
+                    }){Text("Mover")}
+                },
+                dismissButton={TextButton(onClick={delete=null}){Text("Cancelar")}}
+            ) }
             backupMode?.let { mode->PasswordDialog(
                 title=when(mode){
                     "restoreMerge","driveRestoreMerge" -> "Fusionar copia"
