@@ -14,8 +14,10 @@ class RecoveryKeyStore(
     slot: String = "default"
 ) {
     private val safeSlot = slot.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-    private val prefs = context.getSharedPreferences("cheto_recovery_key_$safeSlot", Context.MODE_PRIVATE)
-    private val crypto = DeviceCrypto("cheto_recovery_wrap_v1_$safeSlot")
+    private val prefsName = if (safeSlot == "default") "cheto_recovery_key" else "cheto_recovery_key_$safeSlot"
+    private val keyAlias = if (safeSlot == "default") "cheto_recovery_wrap_v1" else "cheto_recovery_wrap_v1_$safeSlot"
+    private val prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+    private val crypto = DeviceCrypto(keyAlias)
 
     fun configure(password: CharArray) {
         require(password.size >= 10) { "Use at least 10 characters for the recovery password" }
