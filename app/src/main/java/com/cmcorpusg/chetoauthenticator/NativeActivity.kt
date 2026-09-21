@@ -670,19 +670,7 @@ class NativeActivity : FragmentActivity() {
                         .split(',')
                         .filter { it.isNotBlank() }
                         .toSet()
-                    val selected=current.accounts.filter { it.id in ids }
-                    require(selected.isNotEmpty()){"Sin cuentas seleccionadas"}
-                    val usedCategories=(listOf("Sin categoría")+selected.map { it.category }).distinct()
-                    val subset=current.copy(
-                        name="",
-                        emails=emptyList(),
-                        photo="",
-                        categories=usedCategories,
-                        accounts=selected,
-                        categoryColors=current.categoryColors.filterKeys { it in usedCategories },
-                        linkedIdentities=emptyList(),
-                        trash=emptyList()
-                    )
+                    val subset=SelectiveExportPolicy.create(current,ids)
                     val payload=NativeVault.export(subset,password)
                     withContext(Dispatchers.Main){
                         pendingExport=payload
