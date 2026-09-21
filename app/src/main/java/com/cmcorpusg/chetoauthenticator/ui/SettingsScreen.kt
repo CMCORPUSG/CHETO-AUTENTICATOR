@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Info
@@ -51,6 +52,7 @@ internal fun SettingsPage(
     onPin: () -> Unit,
     onBiometricSetup: () -> Unit,
     onSecurityCenter: () -> Unit,
+    onTrash: () -> Unit,
     onAbout: () -> Unit,
     onSensitiveAction: (String, () -> Unit) -> Unit
 ) {
@@ -133,6 +135,13 @@ internal fun SettingsPage(
             ActionRow(Icons.Rounded.Key, "Cambiar PIN", "Actualiza tus 6 dígitos", onPin)
             GroupDivider()
             ActionRow(Icons.Rounded.Category, "Categorías", "Organiza cuentas y colores", onCategories)
+            GroupDivider()
+            ActionRow(
+                Icons.Rounded.DeleteSweep,
+                "Papelera",
+                if (vault.trash.isEmpty()) "Vacía" else "${vault.trash.size} cuenta(s) recuperables",
+                onTrash
+            )
         }
         SettingsGroup("Aplicación") {
             ActionRow(Icons.Rounded.Info, "Acerca de y diagnóstico", "Versión, proveedores, dispositivo y privacidad", onAbout)
