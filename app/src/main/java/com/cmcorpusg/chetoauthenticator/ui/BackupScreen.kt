@@ -218,6 +218,27 @@ internal fun BackupPage(
                                 Text("Restaurar")
                             }
                         }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { action("driveMergeId:${backup.id}") },
+                                enabled = !busy,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = ControlShape
+                            ) {
+                                Text("Fusionar")
+                            }
+                            OutlinedButton(
+                                onClick = { action("driveDeleteId:${backup.id}") },
+                                enabled = !busy,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = ControlShape
+                            ) {
+                                Text("Eliminar")
+                            }
+                        }
                     }
                 }
             }
