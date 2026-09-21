@@ -200,7 +200,14 @@ fun NativeApp(
                     val p=period.toIntOrNull()
                     if(p==null||p !in 1..300||a.issuer.isBlank())onMessage("Completa el servicio y un periodo entre 1 y 300")
                     else runCatching { TotpEngine.generate(normalized,digits=a.digits,period=p,algorithm=a.algorithm) }.onSuccess {
-                        onSave(a.copy(secret=normalized,period=p,issuer=a.issuer.trim(),label=a.label.trim().ifBlank{"Sin etiqueta"}))
+                        val issuer=a.issuer.trim()
+                        onSave(a.copy(
+                            secret=normalized,
+                            period=p,
+                            issuer=issuer,
+                            label=a.label.trim().ifBlank{"Sin etiqueta"},
+                            photo=a.photo.ifBlank { ServiceCatalog.logoUrlFor(issuer).orEmpty() }
+                        ))
                     }.onFailure { onMessage("Clave Base32 inválida. Copia la clave del servicio.") }
                 },modifier=Modifier.fillMaxWidth()){Text("Guardar cuenta")}
                 OutlinedButton(onClick=onDismiss,modifier=Modifier.fillMaxWidth()){Text("Cancelar")}
@@ -263,7 +270,7 @@ fun NativeApp(
         Setting("Modo oscuro",v.dark){onUpdate(v.copy(dark=it))}
         OutlinedButton(onClick=onPin,modifier=Modifier.fillMaxWidth()){Text("Cambiar PIN")}
         OutlinedButton(onClick=onCategories,modifier=Modifier.fillMaxWidth()){Text("Gestionar categorías")}
-        Text("CHETO Authenticator 0.4.0\nAndroid nativo · Kotlin + Jetpack Compose",style=MaterialTheme.typography.bodySmall)
+        Text("CHETO Authenticator 0.5.0\nAndroid nativo · Kotlin + Jetpack Compose",style=MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -280,10 +287,37 @@ fun NativeApp(
     }
 }
 @Composable private fun Avatar(name:String,photo:String){
-    val bitmap=remember(photo){runCatching { if(photo.startsWith("data:image/"))Base64.decode(photo.substringAfter(','),Base64.DEFAULT).let { BitmapFactory.decodeByteArray(it,0,it.size)?.asImageBitmap() } else null }.getOrNull()}
-    Box(Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(Blue),contentAlignment=Alignment.Center){
-        if(bitmap!=null)Image(bitmap,contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=ContentScale.Crop)
-        else Text(name.take(2).uppercase().ifBlank{"CH"},color=Color.White,fontWeight=FontWeight.Bold)
+    val bitmap=remember(photo){
+        runCatching {
+            if(photo.startsWith("data:image/")){
+                Base64.decode(photo.substringAfter(','),Base64.DEFAULT)
+                    .let { BitmapFactory.decodeByteArray(it,0,it.size)?.asImageBitmap() }
+            } else null
+        }.getOrNull()
+    }
+    val remote=remember(name,photo){
+        photo.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+            ?: ServiceCatalog.logoUrlFor(name)
+    }
+    Box(
+        Modifier.size(48.dp).clip(RoundedCornerShape(15.dp)).background(Blue),
+        contentAlignment=Alignment.Center
+    ){
+        Text(name.take(2).uppercase().ifBlank{"CH"},color=Color.White,fontWeight=FontWeight.Bold)
+        when {
+            bitmap!=null -> Image(
+                bitmap,
+                contentDescription="$name logo",
+                modifier=Modifier.fillMaxSize(),
+                contentScale=ContentScale.Crop
+            )
+            remote!=null -> AsyncImage(
+                model=remote,
+                contentDescription="$name logo",
+                modifier=Modifier.fillMaxSize().background(Color.White).padding(6.dp),
+                contentScale=ContentScale.Fit
+            )
+        }
     }
 }
 @Composable private fun PasswordDialog(title:String,description:String,onDismiss:()->Unit,onConfirm:(String)->Unit,numeric:Boolean=false){
