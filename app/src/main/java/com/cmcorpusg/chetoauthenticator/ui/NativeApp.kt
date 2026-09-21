@@ -273,6 +273,16 @@ fun NativeApp(
                                         )
                                     }
                                 },
+                                onBulkExport={ ids->
+                                    if(ids.isNotEmpty()){
+                                        critical=PendingCriticalAction(
+                                            "Exportar ${ids.size} cuentas",
+                                            "Confirma tu identidad antes de crear una copia cifrada con las cuentas seleccionadas."
+                                        ){
+                                            backupMode="exportSelected:"+ids.joinToString(",")
+                                        }
+                                    }
+                                },
                                 onCategories={manageCategories=true}
                             )
                             "Backup"->BackupPage(
@@ -364,14 +374,16 @@ fun NativeApp(
                 dismissButton={TextButton(onClick={delete=null}){Text("Cancelar")}}
             ) }
             backupMode?.let { mode->PasswordDialog(
-                title=when(mode){
-                    "restoreMerge","driveRestoreMerge" -> "Fusionar copia"
-                    "restore","driveRestore" -> "Restaurar copia"
+                title=when{
+                    mode.startsWith("exportSelected:") -> "Exportar selección"
+                    mode=="restoreMerge"||mode=="driveRestoreMerge" -> "Fusionar copia"
+                    mode=="restore"||mode=="driveRestore" -> "Restaurar copia"
                     else -> "Crear copia cifrada"
                 },
-                description=when(mode){
-                    "restoreMerge","driveRestoreMerge" -> "Agregará cuentas, categorías e identidades que no existan, sin borrar tu bóveda actual. Introduce la contraseña de la copia."
-                    "restore","driveRestore" -> "Reemplazará las cuentas y el perfil actuales. Introduce la contraseña de la copia."
+                description=when{
+                    mode.startsWith("exportSelected:") -> "Creará un archivo .cheto cifrado solo con las cuentas seleccionadas. Usa al menos 10 caracteres."
+                    mode=="restoreMerge"||mode=="driveRestoreMerge" -> "Agregará cuentas, categorías e identidades que no existan, sin borrar tu bóveda actual. Introduce la contraseña de la copia."
+                    mode=="restore"||mode=="driveRestore" -> "Reemplazará las cuentas y el perfil actuales. Introduce la contraseña de la copia."
                     else -> "Usa al menos 10 caracteres. Guarda esta contraseña: la necesitarás para recuperar tus cuentas."
                 },
                 onDismiss={backupMode=null},onConfirm={p->if(p.isBlank()||(!mode.contains("estore")&&p.length<10))onMessage("Revisa la contraseña") else {backupMode=null;onBackup(mode,p)}}) }
