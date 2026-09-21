@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Screenshot
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Schedule
@@ -125,7 +126,24 @@ internal fun SettingsPage(
                 { showClipboardTimeout = true }
             )
             GroupDivider()
-            ToggleRow(Icons.Rounded.VisibilityOff, "Ocultar códigos", "Revelar cada TOTP al tocar", vault.hideCodes) { onUpdate(vault.copy(hideCodes = it)) }
+            ToggleRow(Icons.Rounded.VisibilityOff, "Ocultar códigos", "Revelar cada TOTP al tocar", vault.hideCodes) { enabled ->
+                onUpdate(vault.copy(hideCodes = enabled, reauthOnReveal = if (enabled) vault.reauthOnReveal else false))
+            }
+            GroupDivider()
+            ToggleRow(
+                Icons.Rounded.Lock,
+                "Confirmar al revelar",
+                "Pide PIN o biometría antes de mostrar un código oculto",
+                vault.hideCodes && vault.reauthOnReveal
+            ) { enabled ->
+                if (enabled) {
+                    onUpdate(vault.copy(hideCodes = true, reauthOnReveal = true))
+                } else if (vault.reauthOnReveal) {
+                    onSensitiveAction("Desactivar confirmación al revelar") {
+                        onUpdate(vault.copy(reauthOnReveal = false))
+                    }
+                }
+            }
             GroupDivider()
             ToggleRow(Icons.Rounded.Screenshot, "Permitir capturas", "Desactiva la protección de pantalla", vault.screenshots) { enabled ->
                 if (enabled) {
