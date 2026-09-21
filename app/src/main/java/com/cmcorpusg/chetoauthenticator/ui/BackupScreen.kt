@@ -18,6 +18,7 @@ import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -55,6 +56,11 @@ internal fun BackupPage(
     var automatic by remember { mutableStateOf(settings.driveEnabled) }
     LaunchedEffect(busy) { automatic = settings.driveEnabled }
     val lastBackup = if (settings.lastBackupEpochMillis > 0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Sin copias todavía"
+    val lastVerified = if (settings.lastVerifiedBackupEpochMillis > 0) {
+        LimaClock.nowLabel(settings.lastVerifiedBackupEpochMillis)
+    } else {
+        "Nunca verificada"
+    }
     val backupAgeHours = if (settings.lastBackupEpochMillis > 0) {
         (System.currentTimeMillis() - settings.lastBackupEpochMillis).coerceAtLeast(0L) / 3_600_000L
     } else Long.MAX_VALUE
@@ -106,6 +112,15 @@ internal fun BackupPage(
                     "Clave para backup automático",
                     if (recovery.hasConfiguredKey()) "Configurada en este dispositivo" else "Se configura al conectar Drive"
                 )
+                androidx.compose.material3.HorizontalDivider(
+                    Modifier.padding(start = 67.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                InfoRow(
+                    Icons.Rounded.Verified,
+                    "Última verificación",
+                    lastVerified
+                )
             }
         }
 
@@ -128,6 +143,15 @@ internal fun BackupPage(
         ) {
             Text("Fusionar copia sin reemplazar tu bóveda")
         }
+        OutlinedButton(
+            onClick = { action("verify") },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().height(43.dp),
+            shape = ControlShape
+        ) {
+            Icon(Icons.Rounded.Verified, contentDescription = null)
+            Text("  Verificar copia sin restaurar")
+        }
 
         SectionHeader("Nube privada")
         BackupOptionCard(
@@ -141,6 +165,15 @@ internal fun BackupPage(
             onSecondary = { action("driveRestore") }
         )
         if (automatic) {
+            OutlinedButton(
+                onClick = { action("driveVerify") },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                shape = ControlShape
+            ) {
+                Icon(Icons.Rounded.Verified, contentDescription = null)
+                Text("  Verificar última copia de Drive")
+            }
             OutlinedButton(
                 onClick = { action("driveRestoreMerge") },
                 enabled = !busy,
