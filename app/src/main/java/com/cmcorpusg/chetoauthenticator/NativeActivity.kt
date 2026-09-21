@@ -56,6 +56,8 @@ class NativeActivity : FragmentActivity() {
     private var external = false
     private var pendingExport: String? = null
     private var pendingPassword = ""
+    private var recoveryPassword = ""
+    private var recoveryNewPin = ""
     private var pendingRestoreMode = "replace"
     private var pendingDrive: ((String) -> Unit)? = null
     private var photoAccount: String? = null
@@ -98,6 +100,41 @@ class NativeActivity : FragmentActivity() {
             withContext(Dispatchers.Main){if(vault!=null)vault=result}
         }
     }
+    private val recoverFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        external=false
+        val password=recoveryPassword
+        val newPin=recoveryNewPin
+        recoveryPassword=""
+        recoveryNewPin=""
+        if(uri!=null && password.isNotBlank() && newPin.matches(Regex("[0-9]{6}"))){
+            work("Bóveda recuperada. Tu nuevo PIN ya está activo.") {
+                val bytes=contentResolver.openInputStream(uri)!!.use { input ->
+                    val out=ByteArrayOutputStream()
+                    val buffer=ByteArray(8192)
+                    while(true){
+                        val n=input.read(buffer)
+                        if(n<0)break
+                        require(out.size()+n<=16_000_000){"Archivo demasiado grande"}
+                        out.write(buffer,0,n)
+                    }
+                    out.toByteArray()
+                }
+                val base=MobileVault(pin=newPin)
+                val restored=NativeVault.restore(bytes.decodeToString(),password,base)
+                store.write(restored)
+                store.resetPinLockout()
+                val persisted=store.read()
+                withContext(Dispatchers.Main){
+                    vault=persisted
+                    exists=true
+                    applySettings(persisted)
+                }
+            }
+        } else if(uri!=null) {
+            message("Datos de recuperación inválidos")
+        }
+    }
+
     private val pickQr = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         external=false
         if(uri!=null){
@@ -155,7 +192,7 @@ class NativeActivity : FragmentActivity() {
                         store.read()
                     }.onSuccess { persisted->vault=persisted;exists=true }
                         .onFailure { message("No se pudo guardar el perfil") }
-                },onBiometric=::biometric,onBiometricSetup=::requestBiometricSetup,onVerifyPin=::verifyPin,onVerifyBiometric=::reauthenticateBiometric,onChangePin=::changePin,onUpdate=::update,
+                },onRecoverVault=::recoverVault,onBiometric=::biometric,onBiometricSetup=::requestBiometricSetup,onVerifyPin=::verifyPin,onVerifyBiometric=::reauthenticateBiometric,onChangePin=::changePin,onUpdate=::update,
                 googleIdentityConfigured=BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank(),
                 microsoftIdentityConfigured=BuildConfig.MICROSOFT_CLIENT_ID.isNotBlank(),
                 onLinkGoogle=::linkGoogleIdentity,
@@ -226,6 +263,21 @@ class NativeActivity : FragmentActivity() {
             }
         }.onFailure { message("No se pudieron guardar los cambios") }
     }
+    private fun recoverVault(newPin:String,password:String){
+        if(!newPin.matches(Regex("[0-9]{6}"))){
+            message("El nuevo PIN debe tener 6 dígitos")
+            return
+        }
+        if(password.length<10){
+            message("La contraseña de recuperación debe tener al menos 10 caracteres")
+            return
+        }
+        recoveryNewPin=newPin
+        recoveryPassword=password
+        external=true
+        recoverFile.launch(arrayOf("*/*"))
+    }
+
     private fun verifyPin(pin:String):Boolean =
         runCatching {
             store.unlock(pin)
