@@ -135,9 +135,9 @@ fun NativeApp(
                     if(manageCategories){CategoryManagerScreen(vault,onUpdate,{manageCategories=false},onMessage)}
                     else when(page){
                         "Inicio"->HomeScreen(vault,onCopy,{editor=it},{delete=it},{manageCategories=true})
-                        "Backup"->BackupScreen(busy){backupMode=it}
+                        "Backup"->BackupPage(busy){backupMode=it}
                         "Perfil"->UserProfileScreen(vault,onUpdate,{onPhoto(null)},onMessage)
-                        "Ajustes"->SettingsScreen(vault,onUpdate,{manageCategories=true},{changePin=true})
+                        "Ajustes"->SettingsPage(vault,onUpdate,{manageCategories=true},{changePin=true})
                     }
                 }
             }
