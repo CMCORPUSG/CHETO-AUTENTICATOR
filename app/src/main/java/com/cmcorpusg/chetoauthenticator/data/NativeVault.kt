@@ -78,13 +78,7 @@ class NativeVault(context: Context) {
                 ).decodeToString()
             )
         )
-        if (state.trashRetentionDays <= 0 || state.trash.isEmpty()) return state
-
-        val cutoff = System.currentTimeMillis() -
-            state.trashRetentionDays.toLong() * 24L * 60L * 60L * 1000L
-        val retained = state.trash.filter {
-            it.deletedAtEpochMillis <= 0L || it.deletedAtEpochMillis >= cutoff
-        }
+        val retained = TrashPolicy.prune(state.trash, state.trashRetentionDays)
         if (retained.size == state.trash.size) return state
 
         val pruned = state.copy(trash = retained)
