@@ -1444,7 +1444,7 @@ internal fun categoryColor(name:String,overrides:Map<String,String>):Color =
         text={
             Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
                 Text(
-                    "Seleccionarás una copia .cheto cifrada. La contraseña de recuperación permitirá crear un nuevo PIN local sin conocer el PIN anterior."
+                    "Seleccionarás una copia .cheto cifrada. Si la contraseña es correcta, esa copia reemplazará la bóveda local bloqueada y podrás crear un nuevo PIN sin conocer el anterior."
                 )
                 Field(
                     "Nuevo PIN de 6 dígitos",
