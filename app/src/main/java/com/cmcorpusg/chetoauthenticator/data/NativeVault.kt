@@ -19,7 +19,8 @@ import javax.crypto.spec.SecretKeySpec
 data class MobileAccount(
     val id: String = UUID.randomUUID().toString(), val issuer: String = "", val label: String = "",
     val secret: String = "", val category: String = "Sin categoría", val notes: String = "",
-    val digits: Int = 6, val period: Int = 30, val algorithm: String = "SHA1", val photo: String = ""
+    val digits: Int = 6, val period: Int = 30, val algorithm: String = "SHA1", val photo: String = "",
+    val favorite: Boolean = false
 )
 
 data class LinkedIdentity(
@@ -124,7 +125,7 @@ class NativeVault(context: Context) {
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
-        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 6).put("pin", s.pin)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 7).put("pin", s.pin)
             .put(
                 "profile",
                 JSONObject()
@@ -191,6 +192,7 @@ class NativeVault(context: Context) {
                                 .put("period", a.period)
                                 .put("alg", a.algorithm)
                                 .put("logoUrl", a.photo)
+                                .put("favorite", a.favorite)
                         )
                     }
                 }
@@ -248,7 +250,8 @@ class NativeVault(context: Context) {
                     a.optInt("digits", 6),
                     a.optInt("period", 30),
                     a.optString("alg", "SHA1"),
-                    a.optString("logoUrl")
+                    a.optString("logoUrl"),
+                    a.optBoolean("favorite", false)
                 ).also {
                     require(it.digits in 6..8 && it.period in 1..300)
                     TotpEngine.generate(
