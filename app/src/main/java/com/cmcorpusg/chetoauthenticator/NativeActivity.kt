@@ -22,6 +22,7 @@ import com.cmcorpusg.chetoauthenticator.core.OtpAuthParser
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
 import com.cmcorpusg.chetoauthenticator.data.*
 import com.cmcorpusg.chetoauthenticator.ui.NativeApp
+import com.cmcorpusg.chetoauthenticator.ui.ServiceCatalog
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
@@ -149,7 +150,15 @@ class NativeActivity : FragmentActivity() {
     private fun receiveQr(raw:String){
         if(vault==null)return
         runCatching { OtpAuthParser.parse(raw).also { TotpEngine.generate(it.secret,digits=it.digits,period=it.period,algorithm=it.algorithm) } }
-            .onSuccess { scanned=MobileAccount(issuer=it.issuer,label=it.label,secret=it.secret,digits=it.digits,period=it.period,algorithm=it.algorithm) }
+            .onSuccess { scanned=MobileAccount(
+                issuer=it.issuer,
+                label=it.label,
+                secret=it.secret,
+                digits=it.digits,
+                period=it.period,
+                algorithm=it.algorithm,
+                photo=ServiceCatalog.logoUrlFor(it.issuer).orEmpty()
+            ) }
             .onFailure { message("QR TOTP inválido") }
     }
     private fun copyCode(value:String){
