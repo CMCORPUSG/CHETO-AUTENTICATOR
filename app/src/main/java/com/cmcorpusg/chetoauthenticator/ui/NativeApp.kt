@@ -76,7 +76,7 @@ private val Purple=ChetoViolet
 fun NativeApp(
     vault:MobileVault?,exists:Boolean,busy:Boolean,scanned:MobileAccount?,stagedPhoto:String?,biometricReady:Boolean,
     onLogin:(String)->Unit,onRegister:(String,String,String)->Unit,onBiometric:()->Unit,onBiometricSetup:()->Unit,
-    onUpdate:(MobileVault)->Unit,onScan:(Boolean)->Unit,onScannedConsumed:()->Unit,onCopy:(String)->Unit,
+    onChangePin:(String,String)->Unit,onUpdate:(MobileVault)->Unit,onScan:(Boolean)->Unit,onScannedConsumed:()->Unit,onCopy:(String)->Unit,
     onBackup:(String,String)->Unit,onPhoto:(String?)->Unit,onPhotoConsumed:()->Unit,onLock:()->Unit,onMessage:(String)->Unit
 ){
     ChetoTheme(dark=vault?.dark==true){
@@ -154,9 +154,14 @@ fun NativeApp(
                 title=if(mode.contains("estore"))"Restaurar copia" else "Crear copia cifrada",
                 description=if(mode.contains("estore"))"Reemplazará las cuentas y el perfil actuales. Introduce la contraseña de la copia." else "Usa al menos 10 caracteres. Guarda esta contraseña: la necesitarás para recuperar tus cuentas.",
                 onDismiss={backupMode=null},onConfirm={p->if(p.isBlank()||(!mode.contains("estore")&&p.length<10))onMessage("Revisa la contraseña") else {backupMode=null;onBackup(mode,p)}}) }
-            if(changePin)PasswordDialog("Cambiar PIN","Introduce un nuevo PIN de 6 dígitos.",{changePin=false},{p->
-                if(p.matches(Regex("[0-9]{6}"))){onUpdate(vault.copy(pin=p));changePin=false;onMessage("PIN actualizado")}else onMessage("Debe tener 6 dígitos")
-            },numeric=true)
+            if(changePin)ChangePinDialog(
+                onDismiss={changePin=false},
+                onConfirm={currentPin,newPin->
+                    onChangePin(currentPin,newPin)
+                    changePin=false
+                },
+                onMessage=onMessage
+            )
         }
     }
 }
@@ -1111,6 +1116,40 @@ internal fun categoryColor(name:String,overrides:Map<String,String>):Color =
         }
     }
 }
+@Composable private fun ChangePinDialog(
+    onDismiss:()->Unit,
+    onConfirm:(String,String)->Unit,
+    onMessage:(String)->Unit
+){
+    var current by remember { mutableStateOf("") }
+    var next by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest=onDismiss,
+        title={Text("Cambiar PIN")},
+        text={
+            Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+                Text("Confirma tu PIN actual y define uno nuevo de 6 dígitos.")
+                Field("PIN actual",current,{current=it.filter(Char::isDigit).take(6)},password=true,keyboard=KeyboardType.NumberPassword)
+                Field("Nuevo PIN",next,{next=it.filter(Char::isDigit).take(6)},password=true,keyboard=KeyboardType.NumberPassword)
+                Field("Confirmar nuevo PIN",confirm,{confirm=it.filter(Char::isDigit).take(6)},password=true,keyboard=KeyboardType.NumberPassword)
+            }
+        },
+        confirmButton={
+            TextButton(onClick={
+                when{
+                    current.length!=6 -> onMessage("Introduce tu PIN actual de 6 dígitos")
+                    next.length!=6 -> onMessage("El nuevo PIN debe tener 6 dígitos")
+                    next!=confirm -> onMessage("Los nuevos PIN no coinciden")
+                    current==next -> onMessage("El nuevo PIN debe ser diferente")
+                    else -> onConfirm(current,next)
+                }
+            }){Text("Cambiar PIN")}
+        },
+        dismissButton={TextButton(onClick=onDismiss){Text("Cancelar")}}
+    )
+}
+
 @Composable private fun PasswordDialog(title:String,description:String,onDismiss:()->Unit,onConfirm:(String)->Unit,numeric:Boolean=false){
     var password by remember { mutableStateOf("") }
     AlertDialog(onDismissRequest=onDismiss,title={Text(title)},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
