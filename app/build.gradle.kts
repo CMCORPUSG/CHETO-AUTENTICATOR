@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+fun String.asBuildConfigString(): String =
+    """ + replace("\\", "\\\\").replace(""", "\\"") + """
+
+val googleWebClientId = providers.gradleProperty("CHETO_GOOGLE_WEB_CLIENT_ID").orElse("").get()
+val microsoftClientId = providers.gradleProperty("CHETO_MICROSOFT_CLIENT_ID").orElse("").get()
+
 android {
     namespace = "com.cmcorpusg.chetoauthenticator"
     compileSdk = 36
@@ -11,8 +17,11 @@ android {
         applicationId = "com.cmcorpusg.chetoauthenticator"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.10.0"
+        versionCode = 11
+        versionName = "0.11.0"
+
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", googleWebClientId.asBuildConfigString())
+        buildConfigField("String", "MICROSOFT_CLIENT_ID", microsoftClientId.asBuildConfigString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -72,6 +81,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("com.google.android.gms:play-services-auth:21.6.0")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")
 
     testImplementation("junit:junit:4.13.2")
 }
