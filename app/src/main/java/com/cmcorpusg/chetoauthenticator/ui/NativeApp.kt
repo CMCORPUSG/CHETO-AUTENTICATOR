@@ -336,7 +336,10 @@ fun NativeApp(
                                     critical=PendingCriticalAction(
                                         "Acceso al respaldo",
                                         "Confirma tu identidad antes de exportar, restaurar o sincronizar la bóveda."
-                                    ){backupMode=mode}
+                                    ){
+                                        if(mode.startsWith("driveDeleteId:")) onBackup(mode,"")
+                                        else backupMode=mode
+                                    }
                                 },
                                 onDisableAuto={ after->
                                     critical=PendingCriticalAction(
@@ -421,14 +424,14 @@ fun NativeApp(
                 title=when{
                     mode.startsWith("exportSelected:") -> "Exportar selección"
                     mode=="verify"||mode=="driveVerify"||mode.startsWith("driveVerifyId:") -> "Verificar copia"
-                    mode=="restoreMerge"||mode=="driveRestoreMerge" -> "Fusionar copia"
+                    mode=="restoreMerge"||mode=="driveRestoreMerge"||mode.startsWith("driveMergeId:") -> "Fusionar copia"
                     mode=="restore"||mode=="driveRestore"||mode.startsWith("driveRestoreId:") -> "Restaurar copia"
                     else -> "Crear copia cifrada"
                 },
                 description=when{
                     mode.startsWith("exportSelected:") -> "Creará un archivo .cheto cifrado solo con las cuentas seleccionadas. Usa al menos 10 caracteres."
                     mode=="verify"||mode=="driveVerify"||mode.startsWith("driveVerifyId:") -> "CHETO abrirá y validará la copia con esta contraseña, pero no cambiará ninguna cuenta de tu bóveda."
-                    mode=="restoreMerge"||mode=="driveRestoreMerge" -> "Agregará cuentas, categorías e identidades que no existan, sin borrar tu bóveda actual. Introduce la contraseña de la copia."
+                    mode=="restoreMerge"||mode=="driveRestoreMerge"||mode.startsWith("driveMergeId:") -> "Agregará cuentas, categorías e identidades que no existan, sin borrar tu bóveda actual. Introduce la contraseña de la copia."
                     mode=="restore"||mode=="driveRestore"||mode.startsWith("driveRestoreId:") -> "Reemplazará las cuentas y el perfil actuales. Introduce la contraseña de la copia."
                     else -> "Usa al menos 10 caracteres. Guarda esta contraseña: la necesitarás para recuperar tus cuentas."
                 },
