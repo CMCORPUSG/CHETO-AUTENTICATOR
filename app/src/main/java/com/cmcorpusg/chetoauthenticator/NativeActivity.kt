@@ -151,7 +151,7 @@ class NativeActivity : FragmentActivity() {
                 onScan={ photo -> external=true;if(photo)pickQr.launch("image/*") else GmsBarcodeScanning.getClient(this).startScan()
                     .addOnSuccessListener { it.rawValue?.let(::receiveQr) }.addOnFailureListener { message("Escáner no disponible. Usa una imagen o la clave manual.") }
                     .addOnCompleteListener { external=false } },
-                onScannedConsumed={scanned=null},onCopy=::copyCode,onBackup=::backup,
+                onScannedConsumed={scanned=null},onCopy=::copyCode,onBackup=::backup,onDisableBackup=::disableBackup,
                 onPhoto={ account -> photoAccount=account;external=true;pickPhoto.launch("image/*") },
                 onPhotoConsumed={stagedPhoto=null},onLock=::lockNow,onMessage=::message)
         }
@@ -472,6 +472,12 @@ class NativeActivity : FragmentActivity() {
             }else result.accessToken?.let(action) ?: message("Google no devolvió acceso")
         }.addOnFailureListener { pendingExport=null;pendingPassword="";message("Configura OAuth Android y el SHA-1 de este APK para conectar Drive. Puedes usar el respaldo local.") }
     }
+    private fun disableBackup(){
+        BackupSettings(this).driveEnabled=false
+        BackupScheduler.disable(this)
+        message("Backup automático desactivado")
+    }
+
     private fun backup(mode:String,password:String){
         val current=vault?:return
         when(mode){
