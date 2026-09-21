@@ -214,7 +214,13 @@ class NativeActivity : FragmentActivity() {
                 onLogin={ pin -> runCatching { store.unlock(pin) }.onSuccess { vault=it;applySettings(it) }.onFailure { message(it.message?:"No se pudo abrir el perfil") } },
                 onRegister={ name,email,pin ->
                     if(!store.exists())runCatching {
-                        val initial=MobileVault(pin=pin,name=name,emails=listOf(email),accounts=store.legacyAccounts())
+                        val initial=MobileVault(
+                            pin=pin,
+                            name=name,
+                            username=email.substringBefore('@').filter { it.isLetterOrDigit() || it in "._-" }.take(30),
+                            emails=listOf(email),
+                            accounts=store.legacyAccounts()
+                        )
                         store.write(initial)
                         store.read()
                     }.onSuccess { persisted->vault=persisted;exists=true }
