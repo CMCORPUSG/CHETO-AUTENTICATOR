@@ -55,6 +55,26 @@ class VaultMergePolicyTest {
                     subject = "sub-1",
                     email = "backup@example.com"
                 )
+            ),
+            trash = listOf(
+                TrashedAccount(
+                    account = MobileAccount(
+                        id = "trash-google",
+                        issuer = "Steam",
+                        label = "old@example.com",
+                        secret = "CCCC"
+                    ),
+                    deletedAtEpochMillis = 42L
+                ),
+                TrashedAccount(
+                    account = MobileAccount(
+                        id = "trash-duplicate",
+                        issuer = "GitHub",
+                        label = "actual@example.com",
+                        secret = "AAAA"
+                    ),
+                    deletedAtEpochMillis = 43L
+                )
             )
         )
 
@@ -73,5 +93,7 @@ class VaultMergePolicyTest {
         assertEquals("#111111", merged.categoryColors["Trabajo"])
         assertEquals("#222222", merged.categoryColors["Social"])
         assertEquals(1, merged.linkedIdentities.size)
+        assertEquals(1, merged.trash.size)
+        assertEquals("Steam", merged.trash.single().account.issuer)
     }
 }
