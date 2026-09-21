@@ -63,6 +63,11 @@ Before distribution verify:
 - Clipboard timeout and protected code reveal.
 - Automatic device time warning.
 - Google Drive backup, replace restore and merge restore.
+- Verify a local backup without restoring it.
+- Verify the latest Google Drive backup without restoring it.
+- Load Drive backup history and restore a specific encrypted version.
+- Recycle bin retention and restore-all behavior.
+- Multi-QR Google Authenticator migration progress.
 - Google identity linking.
 - Microsoft identity linking.
 - Restore on a second/clean device.
