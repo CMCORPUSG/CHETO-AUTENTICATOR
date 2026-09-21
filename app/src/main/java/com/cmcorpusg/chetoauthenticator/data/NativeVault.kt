@@ -113,7 +113,7 @@ class NativeVault(context: Context) {
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
-        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 4).put("pin", s.pin)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 5).put("pin", s.pin)
             .put(
                 "profile",
                 JSONObject()
