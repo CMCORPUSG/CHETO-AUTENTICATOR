@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PhoneAndroid
@@ -84,6 +85,8 @@ internal fun AboutScreen(
                 DiagnosticRow(Icons.Rounded.Security, "Cuentas TOTP", "${vault.accounts.size}")
                 GroupDividerLocal()
                 DiagnosticRow(Icons.Rounded.CheckCircle, "Categorías", "${vault.categories.size}")
+                GroupDividerLocal()
+                DiagnosticRow(Icons.Rounded.DeleteSweep, "Papelera", "${vault.trash.size} recuperables")
                 GroupDividerLocal()
                 DiagnosticRow(
                     Icons.Rounded.Fingerprint,
