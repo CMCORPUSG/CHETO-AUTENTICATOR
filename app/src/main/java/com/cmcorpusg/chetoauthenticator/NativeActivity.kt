@@ -22,6 +22,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.lifecycleScope
 import com.cmcorpusg.chetoauthenticator.backup.DriveBackupClient
+import com.cmcorpusg.chetoauthenticator.backup.DriveBackupInfo
 import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 import com.cmcorpusg.chetoauthenticator.backup.BackupScheduler
@@ -67,6 +68,7 @@ class NativeActivity : FragmentActivity() {
     private var backgroundAtMillis: Long = 0L
     private var pendingBiometricEnable = false
     private var lastCopiedCode: String? = null
+    private var driveBackups by mutableStateOf<List<DriveBackupInfo>>(emptyList())
     private var migrationBatchId: Long? = null
     private var migrationBatchSize: Int = 0
     private val migrationPages = mutableSetOf<Int>()
@@ -218,6 +220,7 @@ class NativeActivity : FragmentActivity() {
                     .addOnSuccessListener { it.rawValue?.let(::receiveQr) }.addOnFailureListener { message("Escáner no disponible. Usa una imagen o la clave manual.") }
                     .addOnCompleteListener { external=false } },
                 onScannedConsumed={scanned=null},onCopy=::copyCode,onBackup=::backup,onDisableBackup=::disableBackup,
+                driveBackups=driveBackups,onLoadDriveBackups=::loadDriveBackups,
                 onPhoto={ account -> photoAccount=account;external=true;pickPhoto.launch("image/*") },
                 onPhotoConsumed={stagedPhoto=null},onLock=::lockNow,onMessage=::message)
         }
@@ -674,6 +677,15 @@ class NativeActivity : FragmentActivity() {
             }else result.accessToken?.let(action) ?: message("Google no devolvió acceso")
         }.addOnFailureListener { pendingExport=null;pendingPassword="";message("Configura OAuth Android y el SHA-1 de este APK para conectar Drive. Puedes usar el respaldo local.") }
     }
+    private fun loadDriveBackups(){
+        drive { token ->
+            work("Historial de Drive actualizado") {
+                val history=DriveBackupClient("cheto_native_backup_").listRecentBackups(token)
+                withContext(Dispatchers.Main){driveBackups=history}
+            }
+        }
+    }
+
     private fun disableBackup(){
         BackupSettings(this).driveEnabled=false
         BackupScheduler.disable(this)
@@ -682,6 +694,34 @@ class NativeActivity : FragmentActivity() {
 
     private fun backup(mode:String,password:String){
         val current=vault?:return
+
+        if(mode.startsWith("driveRestoreId:")){
+            val fileId=mode.substringAfter("driveRestoreId:")
+            drive { token -> work("Copia histórica de Drive restaurada") {
+                val data=DriveBackupClient("cheto_native_backup_").download(token,fileId)
+                val restored=NativeVault.restore(data,password,current)
+                store.write(restored)
+                withContext(Dispatchers.Main){if(vault!=null)vault=restored}
+            } }
+            return
+        }
+
+        if(mode.startsWith("driveVerifyId:")){
+            val fileId=mode.substringAfter("driveVerifyId:")
+            drive { token -> work("Copia histórica de Drive verificada") {
+                val data=DriveBackupClient("cheto_native_backup_").download(token,fileId)
+                val inspection=NativeVault.inspectBackup(data,password)
+                BackupSettings(this@NativeActivity).lastVerifiedBackupEpochMillis=System.currentTimeMillis()
+                withContext(Dispatchers.Main){
+                    message(
+                        "Copia válida · ${inspection.accountCount} cuentas · " +
+                            "${inspection.categoryCount} categorías"
+                    )
+                }
+            } }
+            return
+        }
+
         when(mode){
             "restore"->{pendingRestoreMode="replace";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
             "restoreMerge"->{pendingRestoreMode="merge";pendingPassword=password;external=true;openFile.launch(arrayOf("*/*"))}
