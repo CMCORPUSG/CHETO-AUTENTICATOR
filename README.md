@@ -1,5 +1,30 @@
 # CHETO-AUTENTICATOR
 
+## App actual: Android nativo 0.4.0
+
+Interfaz en Kotlin y Jetpack Compose, sin HTML ni WebView. Incluye registro y
+perfil local, PIN, biometría, cuentas TOTP, categorías, QR con cámara o imagen,
+fotos locales, modo oscuro y respaldos cifrados `.cheto`.
+
+Abrir esta carpeta (la que contiene `settings.gradle.kts`) en Android Studio.
+También se puede compilar sin abrir Android Studio:
+
+```powershell
+.\gradlew.bat :app:assembleDebug
+```
+
+APK: `app/build/outputs/apk/debug/app-debug.apk`.
+Inicio: `NativeActivity.kt`. Pantallas: `ui/NativeApp.kt`.
+Almacenamiento y respaldos: `data/NativeVault.kt`.
+
+Drive usa autorización real de Google y requiere configurar OAuth Android y
+el SHA-1 de la firma; ver `docs/GOOGLE_DRIVE_SETUP.md`. Esta versión ofrece
+copias manuales. No simula conexión, sincronización automática ni verificación
+de correos. Los correos del perfil son etiquetas locales.
+
+La sección V1 siguiente documenta la implementación anterior, conservada como
+referencia; su interfaz no es el punto de entrada del APK actual.
+
 Autenticador TOTP/2FA para Android, orientado a uso personal y con código fuente auditable.
 
 ## V1

@@ -1,0 +1,97 @@
+package com.cmcorpusg.chetoauthenticator.data
+
+import android.content.Context
+import android.util.Base64
+import com.cmcorpusg.chetoauthenticator.core.TotpEngine
+import com.cmcorpusg.chetoauthenticator.security.DeviceCrypto
+import org.json.JSONArray
+import org.json.JSONObject
+import java.security.SecureRandom
+import java.util.UUID
+import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
+
+data class MobileAccount(
+    val id: String = UUID.randomUUID().toString(), val issuer: String = "", val label: String = "",
+    val secret: String = "", val category: String = "Sin categoría", val notes: String = "",
+    val digits: Int = 6, val period: Int = 30, val algorithm: String = "SHA1", val photo: String = ""
+)
+data class MobileVault(
+    val pin: String = "", val name: String = "", val emails: List<String> = emptyList(), val photo: String = "",
+    val categories: List<String> = listOf("Sin categoría", "Trabajo", "Social", "Personal"),
+    val accounts: List<MobileAccount> = emptyList(), val dark: Boolean = false,
+    val hideCodes: Boolean = false, val biometric: Boolean = true, val screenshots: Boolean = false
+)
+
+class NativeVault(context: Context) {
+    // Same encrypted container as the previous build; no secrets go through a WebView.
+    private val prefs = context.getSharedPreferences("cheto_html_v3", Context.MODE_PRIVATE)
+    private val crypto = DeviceCrypto("cheto_html_v3")
+    private val legacy = SecureAccountStore(context)
+    fun exists() = prefs.contains("vault")
+    fun read(): MobileVault = decode(JSONObject(crypto.decrypt(Base64.decode(prefs.getString("vault", null) ?: error("Sin perfil"), Base64.NO_WRAP)).decodeToString()))
+    @Synchronized fun write(state: MobileVault) {
+        val encoded = Base64.encodeToString(crypto.encrypt(encode(state).toString().toByteArray()), Base64.NO_WRAP)
+        check(prefs.edit().putString("vault", encoded).commit()) { "No se pudieron guardar los cambios" }
+    }
+    fun legacyAccounts() = legacy.load().map { MobileAccount(it.id, it.issuer, it.label, it.secret, digits=it.digits, period=it.period, algorithm=it.algorithm) }
+    @Synchronized fun unlock(pin: String): MobileVault {
+        check(System.currentTimeMillis() >= prefs.getLong("lockedUntil", 0)) { "Espera 30 segundos antes de reintentar" }
+        val state = read()
+        if (state.pin != pin) {
+            val attempts = prefs.getInt("attempts", 0) + 1
+            prefs.edit().putInt("attempts", if(attempts >= 5) 0 else attempts)
+                .putLong("lockedUntil", if(attempts >= 5) System.currentTimeMillis()+30_000 else 0).commit()
+            error("PIN incorrecto")
+        }
+        prefs.edit().putInt("attempts", 0).remove("lockedUntil").commit()
+        return state
+    }
+    companion object {
+        private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
+        private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 3).put("pin", s.pin)
+            .put("profile", JSONObject().put("name",s.name).put("photo",s.photo).put("primaryEmail",s.emails.firstOrNull().orEmpty())
+                .put("emails",JSONArray().apply { s.emails.forEach { put(JSONObject().put("email",it)) } }))
+            .put("categories",JSONArray().apply { s.categories.forEach { put(JSONObject().put("name",it)) } })
+            .put("settings",JSONObject().put("dark",s.dark).put("hide",s.hideCodes).put("biometric",s.biometric).put("screenshots",s.screenshots))
+            .put("accounts",JSONArray().apply { s.accounts.forEach { a -> put(JSONObject().put("id",a.id).put("issuer",a.issuer).put("label",a.label)
+                .put("secret",a.secret).put("category",a.category).put("notes",a.notes).put("digits",a.digits).put("period",a.period).put("alg",a.algorithm).put("logoUrl",a.photo)) } })
+        fun decode(root: JSONObject): MobileVault {
+            val p=root.optJSONObject("profile") ?: JSONObject(); val settings=root.optJSONObject("settings") ?: JSONObject()
+            val arr=root.getJSONArray("accounts"); require(arr.length()<=2000) { "Demasiadas cuentas" }
+            val cats=root.optJSONArray("categories") ?: JSONArray()
+            val categories=(listOf("Sin categoría")+(0 until cats.length()).map { cats.getJSONObject(it).getString("name") }).distinct()
+            val emails=p.optJSONArray("emails") ?: JSONArray()
+            val accounts=(0 until arr.length()).map { i -> val a=arr.getJSONObject(i)
+                MobileAccount(a.optString("id",UUID.randomUUID().toString()),a.getString("issuer"),a.getString("label"),a.getString("secret"),
+                    a.optString("category","Sin categoría"),a.optString("notes"),a.optInt("digits",6),a.optInt("period",30),a.optString("alg","SHA1"),a.optString("logoUrl"))
+                    .also { require(it.digits in 6..8 && it.period in 1..300); TotpEngine.generate(it.secret,digits=it.digits,period=it.period,algorithm=it.algorithm) }
+            }
+            return MobileVault(root.optString("pin"),p.optString("name"),(0 until emails.length()).map { emails.getJSONObject(it).getString("email") }
+                .sortedBy { if(it==p.optString("primaryEmail")) 0 else 1 },p.optString("photo"),categories,accounts,
+                settings.optBoolean("dark"),settings.optBoolean("hide"),settings.optBoolean("biometric",true),settings.optBoolean("screenshots"))
+        }
+        private fun key(password: String, salt: ByteArray): SecretKeySpec {
+            val spec=PBEKeySpec(password.toCharArray(),salt,150000,256)
+            return try { SecretKeySpec(SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded,"AES") } finally { spec.clearPassword() }
+        }
+        fun export(s: MobileVault,password: String): String {
+            require(password.length>=10)
+            val salt=ByteArray(16).also { SecureRandom().nextBytes(it) }; val iv=ByteArray(12).also { SecureRandom().nextBytes(it) }
+            val cipher=Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE,key(password,salt),GCMParameterSpec(128,iv))
+            val payload=encode(s).apply { remove("pin"); remove("settings") }.toString()
+            return JSONObject().put("v",1).put("alg","AES-256-GCM").put("iterations",150000).put("salt",b64(salt)).put("iv",b64(iv))
+                .put("data",b64(cipher.doFinal(payload.toByteArray()))).toString()
+        }
+        fun restore(data: String,password: String,current: MobileVault): MobileVault {
+            val obj=JSONObject(data);require(obj.getInt("v")==1&&obj.getInt("iterations")==150000&&obj.getString("alg")=="AES-256-GCM")
+            val cipher=Cipher.getInstance("AES/GCM/NoPadding");cipher.init(Cipher.DECRYPT_MODE,key(password,bytes(obj.getString("salt"))),GCMParameterSpec(128,bytes(obj.getString("iv"))))
+            val restored=decode(JSONObject(cipher.doFinal(bytes(obj.getString("data"))).decodeToString()))
+            return current.copy(name=restored.name,emails=restored.emails,photo=restored.photo,categories=restored.categories,accounts=restored.accounts)
+        }
+    }
+}

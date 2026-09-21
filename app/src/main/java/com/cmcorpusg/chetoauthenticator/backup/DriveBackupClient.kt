@@ -8,11 +8,11 @@ import java.net.URLEncoder
 import java.util.UUID
 import org.json.JSONObject
 
-class DriveBackupClient {
+class DriveBackupClient(private val prefix: String = "cheto_backup_") {
     fun upload(accessToken: String, encryptedPayload: String) {
         val boundary = "cheto-${UUID.randomUUID()}"
         val metadata = JSONObject()
-            .put("name", "cheto_backup_${System.currentTimeMillis()}.enc")
+            .put("name", "${prefix}${System.currentTimeMillis()}.enc")
             .put("parents", org.json.JSONArray().put("appDataFolder"))
             .toString()
 
@@ -69,7 +69,7 @@ class DriveBackupClient {
 
     private fun listBackups(accessToken: String, pageSize: Int): List<Pair<String, String>> {
         val query = URLEncoder.encode(
-            "name contains 'cheto_backup_' and trashed = false",
+            "name contains '$prefix' and trashed = false",
             Charsets.UTF_8.name()
         )
         val fields = URLEncoder.encode("files(id,name,modifiedTime)", Charsets.UTF_8.name())

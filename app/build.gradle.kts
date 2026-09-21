@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId = "com.cmcorpusg.chetoauthenticator"
-        minSdk = 23
+        minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 4
+        versionName = "0.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -67,6 +67,7 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
 
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("com.google.android.gms:play-services-auth:21.6.0")
 
     testImplementation("junit:junit:4.13.2")

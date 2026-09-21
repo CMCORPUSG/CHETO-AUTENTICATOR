@@ -8,6 +8,7 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:label="CHETO Authenticator"
+        android:icon="@drawable/ic_cheto"
         android:supportsRtl="true"
         android:theme="@style/Theme.ChetoAuthenticator"
         android:usesCleartextTraffic="false">
@@ -15,7 +16,7 @@
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="barcode_ui" />
         <activity
-            android:name=".MainActivity"
+            android:name=".NativeActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
