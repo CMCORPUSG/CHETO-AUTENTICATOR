@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import com.cmcorpusg.chetoauthenticator.backup.BackupScheduler
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
 import com.cmcorpusg.chetoauthenticator.core.TotpEngine
+import com.cmcorpusg.chetoauthenticator.data.AccountPolicy
 import com.cmcorpusg.chetoauthenticator.data.MobileAccount
 import com.cmcorpusg.chetoauthenticator.data.MobileVault
 import coil.compose.AsyncImage
@@ -71,11 +72,18 @@ import kotlinx.coroutines.delay
 private val Blue=ChetoBlue
 private val Purple=ChetoViolet
 
+private data class PendingCriticalAction(
+    val title:String,
+    val description:String,
+    val action:()->Unit
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeApp(
     vault:MobileVault?,exists:Boolean,busy:Boolean,scanned:MobileAccount?,stagedPhoto:String?,biometricReady:Boolean,
     onLogin:(String)->Unit,onRegister:(String,String,String)->Unit,onBiometric:()->Unit,onBiometricSetup:()->Unit,
+    onVerifyPin:(String)->Boolean,onVerifyBiometric:((()->Unit))->Unit,
     onChangePin:(String,String)->Unit,onUpdate:(MobileVault)->Unit,onScan:(Boolean)->Unit,onScannedConsumed:()->Unit,onCopy:(String)->Unit,
     onBackup:(String,String)->Unit,onPhoto:(String?)->Unit,onPhotoConsumed:()->Unit,onLock:()->Unit,onMessage:(String)->Unit
 ){
@@ -89,11 +97,20 @@ fun NativeApp(
             var backupMode by remember { mutableStateOf<String?>(null) }
             var changePin by remember { mutableStateOf(false) }
             var manageCategories by remember { mutableStateOf(false) }
+            var securityCenter by remember { mutableStateOf(false) }
+            var critical by remember { mutableStateOf<PendingCriticalAction?>(null) }
             var clockMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
             LaunchedEffect(Unit){ while(true){ clockMillis=System.currentTimeMillis(); delay(30_000) } }
             LaunchedEffect(scanned){if(scanned!=null){addAccount=false;editor=scanned;onScannedConsumed()}}
             LaunchedEffect(stagedPhoto){if(stagedPhoto!=null&&editor!=null){editor=editor!!.copy(photo=stagedPhoto);onPhotoConsumed()}}
-            BackHandler { when { editor!=null->editor=null;addAccount->addAccount=false;manageCategories->manageCategories=false;page!="Inicio"->page="Inicio";else->onLock() } }
+            BackHandler { when {
+                editor!=null->editor=null
+                addAccount->addAccount=false
+                manageCategories->manageCategories=false
+                securityCenter->securityCenter=false
+                page!="Inicio"->page="Inicio"
+                else->onLock()
+            } }
             Scaffold(
                 topBar={
                     Column(
@@ -107,13 +124,22 @@ fun NativeApp(
                                 }
                             }
                             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(1.dp)){
-                                Text(if(manageCategories)"Categorías" else page,color=Color.White,fontSize=19.sp,fontWeight=FontWeight.Bold)
+                                Text(
+                                    when {
+                                        manageCategories -> "Categorías"
+                                        securityCenter -> "Centro de seguridad"
+                                        else -> page
+                                    },
+                                    color=Color.White,
+                                    fontSize=19.sp,
+                                    fontWeight=FontWeight.Bold
+                                )
                                 Text("CHETO · Lima · " + LimaClock.nowLabel(clockMillis),color=Color.White.copy(alpha=.72f),style=MaterialTheme.typography.labelSmall)
                             }
                             IconButton(onClick=onLock){Icon(Icons.Rounded.Lock,contentDescription="Bloquear",tint=Color.White)}
                         }
                     }
-                },bottomBar={if(!manageCategories)NavigationBar(containerColor=MaterialTheme.colorScheme.surface,tonalElevation=3.dp) {
+                },bottomBar={if(!manageCategories&&!securityCenter)NavigationBar(containerColor=MaterialTheme.colorScheme.surface,tonalElevation=3.dp) {
                     val destinations=listOf(
                         Triple("Inicio",Icons.Rounded.Home,"Inicio"),
                         Triple("Backup",Icons.Rounded.Cloud,"Backup"),
@@ -128,16 +154,50 @@ fun NativeApp(
                             label={Text(label)}
                         )
                     }
-                }},floatingActionButton={if(page=="Inicio"&&!manageCategories)FloatingActionButton(onClick={addAccount=true},containerColor=Blue,contentColor=Color.White,shape=RoundedCornerShape(17.dp)){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
+                }},floatingActionButton={if(page=="Inicio"&&!manageCategories&&!securityCenter)FloatingActionButton(onClick={addAccount=true},containerColor=Blue,contentColor=Color.White,shape=RoundedCornerShape(17.dp)){Icon(Icons.Rounded.Add,contentDescription="Agregar cuenta")}}
             ){padding->
                 Column(Modifier.padding(padding).fillMaxSize()){
                     if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
-                    if(manageCategories){CategoryManagerScreen(vault,onUpdate,{manageCategories=false},onMessage)}
-                    else when(page){
-                        "Inicio"->HomeScreen(vault,onCopy,{editor=it},{delete=it},{manageCategories=true})
-                        "Backup"->BackupPage(busy){backupMode=it}
-                        "Perfil"->UserProfileScreen(vault,onUpdate,{onPhoto(null)},onMessage)
-                        "Ajustes"->SettingsPage(vault,biometricReady,onUpdate,{manageCategories=true},{changePin=true},onBiometricSetup)
+                    when {
+                        manageCategories -> CategoryManagerScreen(vault,onUpdate,{manageCategories=false},onMessage)
+                        securityCenter -> SecurityCenterScreen(vault,biometricReady,onLock)
+                        else -> when(page){
+                            "Inicio"->HomeScreen(
+                                vault,
+                                onCopy,
+                                {editor=it},
+                                { account->
+                                    critical=PendingCriticalAction(
+                                        "Eliminar cuenta",
+                                        "Confirma tu identidad antes de eliminar una cuenta TOTP."
+                                    ){delete=account}
+                                },
+                                {manageCategories=true}
+                            )
+                            "Backup"->BackupPage(busy){ mode->
+                                critical=PendingCriticalAction(
+                                    "Acceso al respaldo",
+                                    "Confirma tu identidad antes de exportar, restaurar o sincronizar la bóveda."
+                                ){backupMode=mode}
+                            }
+                            "Perfil"->UserProfileScreen(vault,onUpdate,{onPhoto(null)},onMessage)
+                            "Ajustes"->SettingsPage(
+                                vault,
+                                biometricReady,
+                                onUpdate,
+                                {manageCategories=true},
+                                {changePin=true},
+                                onBiometricSetup,
+                                {securityCenter=true},
+                                {title,action->
+                                    critical=PendingCriticalAction(
+                                        title,
+                                        "Esta opción cambia la protección de CHETO. Confirma tu identidad para continuar.",
+                                        action
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -147,7 +207,13 @@ fun NativeApp(
                 onManual={account->addAccount=false;editor=account}
             )
             editor?.let { account->AccountEditor(account,vault.categories,onPhoto={onPhoto(account.id)},onDismiss={editor=null},onSave={a->
-                onUpdate(vault.copy(accounts=if(vault.accounts.any { it.id==a.id })vault.accounts.map { if(it.id==a.id)a else it } else vault.accounts+a));editor=null
+                val duplicate=AccountPolicy.findDuplicate(a,vault.accounts)
+                if(duplicate!=null){
+                    onMessage("Ya existe una cuenta igual: ${duplicate.issuer} · ${duplicate.label}")
+                }else{
+                    onUpdate(vault.copy(accounts=if(vault.accounts.any { it.id==a.id })vault.accounts.map { if(it.id==a.id)a else it } else vault.accounts+a))
+                    editor=null
+                }
             },onMessage=onMessage) }
             delete?.let { account->AlertDialog(onDismissRequest={delete=null},title={Text("Eliminar cuenta")},text={Text("¿Eliminar ${account.issuer} (${account.label})? Conserva una copia antes de eliminarla.")},confirmButton={TextButton(onClick={onUpdate(vault.copy(accounts=vault.accounts.filterNot { it.id==account.id }));delete=null}){Text("Eliminar")}},dismissButton={TextButton(onClick={delete=null}){Text("Cancelar")}}) }
             backupMode?.let { mode->PasswordDialog(
@@ -162,6 +228,22 @@ fun NativeApp(
                 },
                 onMessage=onMessage
             )
+            critical?.let { pending->
+                CriticalActionDialog(
+                    title=pending.title,
+                    description=pending.description,
+                    biometricAvailable=vault.biometric&&biometricReady,
+                    onDismiss={critical=null},
+                    onVerifyPin=onVerifyPin,
+                    onVerifyBiometric=onVerifyBiometric,
+                    onConfirmed={
+                        val action=pending.action
+                        critical=null
+                        action()
+                    },
+                    onMessage=onMessage
+                )
+            }
         }
     }
 }
@@ -1116,6 +1198,52 @@ internal fun categoryColor(name:String,overrides:Map<String,String>):Color =
         }
     }
 }
+@Composable private fun CriticalActionDialog(
+    title:String,
+    description:String,
+    biometricAvailable:Boolean,
+    onDismiss:()->Unit,
+    onVerifyPin:(String)->Boolean,
+    onVerifyBiometric:((()->Unit))->Unit,
+    onConfirmed:()->Unit,
+    onMessage:(String)->Unit
+){
+    var pin by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest=onDismiss,
+        title={Text(title)},
+        text={
+            Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
+                Text(description)
+                Field(
+                    "PIN de CHETO",
+                    pin,
+                    {pin=it.filter(Char::isDigit).take(6)},
+                    password=true,
+                    keyboard=KeyboardType.NumberPassword
+                )
+                if(biometricAvailable){
+                    FilledTonalButton(
+                        onClick={onVerifyBiometric(onConfirmed)},
+                        modifier=Modifier.fillMaxWidth()
+                    ){
+                        Icon(Icons.Rounded.Fingerprint,contentDescription=null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Confirmar con biometría")
+                    }
+                }
+            }
+        },
+        confirmButton={
+            TextButton(onClick={
+                if(pin.length!=6) onMessage("Introduce tu PIN de 6 dígitos")
+                else if(onVerifyPin(pin)) onConfirmed()
+            }){Text("Confirmar con PIN")}
+        },
+        dismissButton={TextButton(onClick=onDismiss){Text("Cancelar")}}
+    )
+}
+
 @Composable private fun ChangePinDialog(
     onDismiss:()->Unit,
     onConfirm:(String,String)->Unit,
