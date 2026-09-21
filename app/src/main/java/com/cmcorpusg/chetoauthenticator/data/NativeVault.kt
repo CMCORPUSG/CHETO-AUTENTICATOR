@@ -21,6 +21,16 @@ data class MobileAccount(
     val secret: String = "", val category: String = "Sin categoría", val notes: String = "",
     val digits: Int = 6, val period: Int = 30, val algorithm: String = "SHA1", val photo: String = ""
 )
+
+data class LinkedIdentity(
+    val provider: String,
+    val subject: String,
+    val email: String,
+    val displayName: String = "",
+    val photo: String = "",
+    val linkedAtEpochMillis: Long = System.currentTimeMillis()
+)
+
 data class MobileVault(
     // "pin" stores a PBKDF2 verifier in persisted state. A six-digit value is
     // accepted only as a short-lived migration/input value and is normalized on write.
@@ -29,7 +39,8 @@ data class MobileVault(
     val accounts: List<MobileAccount> = emptyList(), val dark: Boolean = false,
     val hideCodes: Boolean = false, val biometric: Boolean = false, val screenshots: Boolean = false,
     val categoryColors: Map<String, String> = emptyMap(),
-    val lockTimeoutSeconds: Int = 0
+    val lockTimeoutSeconds: Int = 0,
+    val linkedIdentities: List<LinkedIdentity> = emptyList()
 )
 
 class NativeVault(context: Context) {
@@ -113,7 +124,7 @@ class NativeVault(context: Context) {
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
-        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 5).put("pin", s.pin)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 6).put("pin", s.pin)
             .put(
                 "profile",
                 JSONObject()
@@ -124,6 +135,22 @@ class NativeVault(context: Context) {
                         "emails",
                         JSONArray().apply {
                             s.emails.forEach { put(JSONObject().put("email", it)) }
+                        }
+                    )
+                    .put(
+                        "linkedIdentities",
+                        JSONArray().apply {
+                            s.linkedIdentities.forEach { identity ->
+                                put(
+                                    JSONObject()
+                                        .put("provider", identity.provider)
+                                        .put("subject", identity.subject)
+                                        .put("email", identity.email)
+                                        .put("displayName", identity.displayName)
+                                        .put("photo", identity.photo)
+                                        .put("linkedAt", identity.linkedAtEpochMillis)
+                                )
+                            }
                         }
                     )
             )
@@ -183,6 +210,25 @@ class NativeVault(context: Context) {
                 ).distinct()
 
             val emails = p.optJSONArray("emails") ?: JSONArray()
+            val identitiesArray = p.optJSONArray("linkedIdentities") ?: JSONArray()
+            val linkedIdentities = (0 until identitiesArray.length()).mapNotNull { index ->
+                val item = identitiesArray.optJSONObject(index) ?: return@mapNotNull null
+                val provider = item.optString("provider").trim().lowercase()
+                val subject = item.optString("subject").trim()
+                val email = item.optString("email").trim()
+                if (provider !in setOf("google", "microsoft") || subject.isBlank() || email.isBlank()) {
+                    null
+                } else {
+                    LinkedIdentity(
+                        provider = provider,
+                        subject = subject,
+                        email = email,
+                        displayName = item.optString("displayName"),
+                        photo = item.optString("photo"),
+                        linkedAtEpochMillis = item.optLong("linkedAt", 0L).coerceAtLeast(0L)
+                    )
+                }
+            }.distinctBy { it.provider + ":" + it.subject }
             val colorsObject = root.optJSONObject("categoryColors") ?: JSONObject()
             val categoryColors = buildMap<String, String> {
                 colorsObject.keys().forEach { key ->
@@ -228,7 +274,8 @@ class NativeVault(context: Context) {
                 if (version >= 4) settings.optBoolean("biometric", false) else false,
                 settings.optBoolean("screenshots"),
                 categoryColors,
-                settings.optInt("lockTimeoutSeconds", 0).takeIf { it in setOf(0, 30, 60, 300) } ?: 0
+                settings.optInt("lockTimeoutSeconds", 0).takeIf { it in setOf(0, 30, 60, 300) } ?: 0,
+                linkedIdentities
             )
         }
 
@@ -298,7 +345,8 @@ class NativeVault(context: Context) {
                 photo = restored.photo,
                 categories = restored.categories,
                 accounts = restored.accounts,
-                categoryColors = restored.categoryColors
+                categoryColors = restored.categoryColors,
+                linkedIdentities = restored.linkedIdentities
             )
         }
     }
