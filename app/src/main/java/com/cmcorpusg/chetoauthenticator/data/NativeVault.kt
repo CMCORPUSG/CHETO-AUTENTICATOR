@@ -56,7 +56,8 @@ data class MobileVault(
     val linkedIdentities: List<LinkedIdentity> = emptyList(),
     val trash: List<TrashedAccount> = emptyList(),
     val clipboardClearSeconds: Int = 30,
-    val reauthOnReveal: Boolean = false
+    val reauthOnReveal: Boolean = false,
+    val trashRetentionDays: Int = 30
 )
 
 class NativeVault(context: Context) {
@@ -66,16 +67,30 @@ class NativeVault(context: Context) {
 
     fun exists() = prefs.contains("vault")
 
-    fun read(): MobileVault = decode(
-        JSONObject(
-            crypto.decrypt(
-                Base64.decode(
-                    prefs.getString("vault", null) ?: error("Sin perfil"),
-                    Base64.NO_WRAP
-                )
-            ).decodeToString()
+    fun read(): MobileVault {
+        val state = decode(
+            JSONObject(
+                crypto.decrypt(
+                    Base64.decode(
+                        prefs.getString("vault", null) ?: error("Sin perfil"),
+                        Base64.NO_WRAP
+                    )
+                ).decodeToString()
+            )
         )
-    )
+        if (state.trashRetentionDays <= 0 || state.trash.isEmpty()) return state
+
+        val cutoff = System.currentTimeMillis() -
+            state.trashRetentionDays.toLong() * 24L * 60L * 60L * 1000L
+        val retained = state.trash.filter {
+            it.deletedAtEpochMillis <= 0L || it.deletedAtEpochMillis >= cutoff
+        }
+        if (retained.size == state.trash.size) return state
+
+        val pruned = state.copy(trash = retained)
+        write(pruned)
+        return pruned
+    }
 
     @Synchronized
     fun write(state: MobileVault) {
@@ -172,7 +187,7 @@ class NativeVault(context: Context) {
         private fun b64(value: ByteArray) = Base64.encodeToString(value, Base64.NO_WRAP)
         private fun bytes(value: String) = Base64.decode(value, Base64.NO_WRAP)
 
-        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 10).put("pin", s.pin)
+        fun encode(s: MobileVault): JSONObject = JSONObject().put("version", 11).put("pin", s.pin)
             .put(
                 "profile",
                 JSONObject()
@@ -224,6 +239,7 @@ class NativeVault(context: Context) {
                     .put("lockTimeoutSeconds", s.lockTimeoutSeconds)
                     .put("clipboardClearSeconds", s.clipboardClearSeconds)
                     .put("reauthOnReveal", s.reauthOnReveal)
+                    .put("trashRetentionDays", s.trashRetentionDays)
             )
             .put(
                 "accounts",
@@ -367,7 +383,9 @@ class NativeVault(context: Context) {
                 trash,
                 settings.optInt("clipboardClearSeconds", 30)
                     .takeIf { it in setOf(15, 30, 60, 120) } ?: 30,
-                settings.optBoolean("reauthOnReveal", false)
+                settings.optBoolean("reauthOnReveal", false),
+                settings.optInt("trashRetentionDays", 30)
+                    .takeIf { it in setOf(0, 7, 30, 90) } ?: 30
             )
         }
 
