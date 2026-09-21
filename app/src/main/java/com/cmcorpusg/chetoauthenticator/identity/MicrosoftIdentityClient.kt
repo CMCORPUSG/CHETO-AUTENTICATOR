@@ -13,11 +13,23 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+data class MicrosoftOneDriveSession(
+    val accessToken: String,
+    val accountId: String,
+    val email: String
+)
+
 class MicrosoftIdentityClient(
     private val activity: FragmentActivity
 ) {
-    suspend fun acquireOneDriveToken(): String =
-        acquireToken(arrayOf("Files.ReadWrite.AppFolder", "User.Read")).accessToken
+    suspend fun acquireOneDriveSession(): MicrosoftOneDriveSession {
+        val result = acquireToken(arrayOf("Files.ReadWrite.AppFolder", "User.Read"))
+        return MicrosoftOneDriveSession(
+            accessToken = result.accessToken,
+            accountId = result.account.id,
+            email = result.account.username.orEmpty()
+        )
+    }
 
     suspend fun signIn(): IdentityAuthResult {
         val authenticationResult = acquireToken(arrayOf("User.Read"))
