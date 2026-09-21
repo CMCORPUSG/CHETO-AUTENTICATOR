@@ -13,6 +13,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.ContentPasteOff
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Schedule
@@ -52,7 +54,8 @@ internal fun SecurityCenterScreen(
         vault.lockTimeoutSeconds <= 60,
         vault.hideCodes,
         backup.driveEnabled,
-        recoveryKeyConfigured
+        recoveryKeyConfigured,
+        vault.clipboardClearSeconds <= 30
     ).count { it }
 
     Column(
@@ -72,7 +75,7 @@ internal fun SecurityCenterScreen(
                     Column {
                         Text("Centro de seguridad", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            "$protectedCount de 6 protecciones recomendadas activas",
+                            "$protectedCount de 7 protecciones recomendadas activas",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -114,6 +117,18 @@ internal fun SecurityCenterScreen(
             "Códigos ocultos",
             if (vault.hideCodes) "Se revelan temporalmente al tocar" else "Visibles mientras la bóveda está abierta",
             vault.hideCodes
+        )
+        SecurityStatus(
+            Icons.Rounded.ContentPasteOff,
+            "Portapapeles sensible",
+            "Los códigos se limpian en ${vault.clipboardClearSeconds} segundos o al bloquear CHETO",
+            vault.clipboardClearSeconds <= 30
+        )
+        SecurityStatus(
+            Icons.Rounded.DeleteSweep,
+            "Papelera cifrada",
+            if (vault.trash.isEmpty()) "Vacía · lista para proteger eliminaciones accidentales" else "${vault.trash.size} cuenta(s) recuperables",
+            true
         )
         SecurityStatus(
             Icons.Rounded.Backup,
