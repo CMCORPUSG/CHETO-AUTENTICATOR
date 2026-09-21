@@ -17,9 +17,14 @@ class BackupSettings(context: Context) {
         get() = prefs.getString(KEY_LAST_ERROR, null)
         set(value) = prefs.edit().putString(KEY_LAST_ERROR, value).apply()
 
+    var lastVerifiedBackupEpochMillis: Long
+        get() = prefs.getLong(KEY_LAST_VERIFIED_BACKUP, 0L)
+        set(value) = prefs.edit().putLong(KEY_LAST_VERIFIED_BACKUP, value).apply()
+
     companion object {
         private const val KEY_DRIVE_ENABLED = "drive_enabled"
         private const val KEY_LAST_BACKUP = "last_backup"
         private const val KEY_LAST_ERROR = "last_error"
+        private const val KEY_LAST_VERIFIED_BACKUP = "last_verified_backup"
     }
 }
