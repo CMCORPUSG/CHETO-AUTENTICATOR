@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.cmcorpusg.chetoauthenticator.BuildConfig
 import com.cmcorpusg.chetoauthenticator.data.MobileVault
 
 @Composable
@@ -174,7 +175,7 @@ internal fun SettingsPage(
             ActionRow(Icons.Rounded.Info, "Acerca de y diagnóstico", "Versión, proveedores, dispositivo y privacidad", onAbout)
         }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("CHETO Authenticator 0.13.0", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("CHETO Authenticator ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Android nativo · Kotlin + Compose", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
