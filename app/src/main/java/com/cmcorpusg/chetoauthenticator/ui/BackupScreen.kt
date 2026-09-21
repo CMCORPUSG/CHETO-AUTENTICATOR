@@ -51,6 +51,7 @@ internal fun BackupPage(
     busy: Boolean,
     driveBackups: List<DriveBackupInfo>,
     onLoadDriveBackups: () -> Unit,
+    microsoftConfigured: Boolean,
     action: (String) -> Unit,
     onDisableAuto: ((() -> Unit)) -> Unit
 ) {
@@ -58,6 +59,7 @@ internal fun BackupPage(
     val settings = remember { BackupSettings(context) }
     val recovery = remember { RecoveryKeyStore(context) }
     var automatic by remember { mutableStateOf(settings.driveEnabled) }
+    var oneDriveConnected by remember { mutableStateOf(settings.oneDriveEnabled) }
     LaunchedEffect(busy) { automatic = settings.driveEnabled }
     val lastBackup = if (settings.lastBackupEpochMillis > 0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Sin copias todavía"
     val lastVerified = if (settings.lastVerifiedBackupEpochMillis > 0) {
@@ -263,6 +265,36 @@ internal fun BackupPage(
                 Text("Fusionar última copia de Drive")
             }
         }
+        SectionHeader("Microsoft", "Outlook / Hotmail usa OneDrive, no Google Drive")
+        BackupOptionCard(
+            icon = Icons.Rounded.Cloud,
+            title = "Microsoft OneDrive",
+            subtitle = if (microsoftConfigured) {
+                "Copia .cheto cifrada dentro de la carpeta privada de CHETO en OneDrive"
+            } else {
+                "Falta configurar la aplicación Microsoft Entra para habilitar OneDrive"
+            },
+            primaryLabel = if (oneDriveConnected) "Guardar ahora" else "Conectar OneDrive",
+            secondaryLabel = "Restaurar última",
+            enabled = !busy && microsoftConfigured,
+            onPrimary = {
+                action("onedrive")
+                oneDriveConnected = true
+            },
+            onSecondary = { action("onedriveRestore") }
+        )
+        if (microsoftConfigured) {
+            OutlinedButton(
+                onClick = { action("onedriveVerify") },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                shape = ControlShape
+            ) {
+                Icon(Icons.Rounded.Verified, contentDescription = null)
+                Text("  Verificar última copia de OneDrive")
+            }
+        }
+
         if (automatic) {
             OutlinedButton(
                 onClick = { onDisableAuto { automatic = false } },
