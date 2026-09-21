@@ -175,16 +175,16 @@ fun NativeApp(
                         )
                         else -> when(page){
                             "Inicio"->HomeScreen(
-                                vault,
-                                onCopy,
-                                {editor=it},
-                                { account->
+                                vault=vault,
+                                onCopy=onCopy,
+                                onEdit={editor=it},
+                                onDelete={ account->
                                     critical=PendingCriticalAction(
                                         "Eliminar cuenta",
                                         "Confirma tu identidad antes de eliminar una cuenta TOTP."
                                     ){delete=account}
                                 },
-                                { account->
+                                onToggleFavorite={ account->
                                     onUpdate(
                                         vault.copy(
                                             accounts=vault.accounts.map {
@@ -193,7 +193,43 @@ fun NativeApp(
                                         )
                                     )
                                 },
-                                {manageCategories=true}
+                                onBulkDelete={ ids->
+                                    if(ids.isNotEmpty()){
+                                        critical=PendingCriticalAction(
+                                            "Eliminar ${ids.size} cuentas",
+                                            "Esta acción eliminará varias cuentas TOTP. Confirma tu identidad para continuar."
+                                        ){
+                                            onUpdate(
+                                                vault.copy(
+                                                    accounts=vault.accounts.filterNot { it.id in ids }
+                                                )
+                                            )
+                                        }
+                                    }
+                                },
+                                onBulkCategory={ ids,target->
+                                    if(ids.isNotEmpty()){
+                                        onUpdate(
+                                            vault.copy(
+                                                accounts=vault.accounts.map {
+                                                    if(it.id in ids) it.copy(category=target) else it
+                                                }
+                                            )
+                                        )
+                                    }
+                                },
+                                onBulkFavorite={ ids,favorite->
+                                    if(ids.isNotEmpty()){
+                                        onUpdate(
+                                            vault.copy(
+                                                accounts=vault.accounts.map {
+                                                    if(it.id in ids) it.copy(favorite=favorite) else it
+                                                }
+                                            )
+                                        )
+                                    }
+                                },
+                                onCategories={manageCategories=true}
                             )
                             "Backup"->BackupPage(
                                 vault=vault,
