@@ -18,6 +18,7 @@ import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,18 +39,31 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
+import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
+import com.cmcorpusg.chetoauthenticator.data.MobileVault
 
 @Composable
 internal fun BackupPage(
+    vault: MobileVault,
     busy: Boolean,
     action: (String) -> Unit,
     onDisableAuto: ((() -> Unit)) -> Unit
 ) {
     val context = LocalContext.current
     val settings = remember { BackupSettings(context) }
+    val recovery = remember { RecoveryKeyStore(context) }
     var automatic by remember { mutableStateOf(settings.driveEnabled) }
     LaunchedEffect(busy) { automatic = settings.driveEnabled }
     val lastBackup = if (settings.lastBackupEpochMillis > 0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Sin copias todavía"
+    val backupAgeHours = if (settings.lastBackupEpochMillis > 0) {
+        (System.currentTimeMillis() - settings.lastBackupEpochMillis).coerceAtLeast(0L) / 3_600_000L
+    } else Long.MAX_VALUE
+    val freshness = when {
+        settings.lastBackupEpochMillis <= 0L -> "Sin copia"
+        backupAgeHours < 36 -> "Reciente"
+        backupAgeHours < 72 -> "Revisar"
+        else -> "Desactualizada"
+    }
 
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 16.dp),
@@ -74,6 +88,25 @@ internal fun BackupPage(
         }
         settings.lastError?.takeIf { it.isNotBlank() }?.let {
             Text("Último aviso: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+
+        PremiumCard(Modifier.fillMaxWidth()) {
+            Column {
+                InfoRow(
+                    Icons.Rounded.VerifiedUser,
+                    "Estado de recuperación",
+                    "${vault.accounts.size} cuentas · $freshness"
+                )
+                androidx.compose.material3.HorizontalDivider(
+                    Modifier.padding(start = 67.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                InfoRow(
+                    Icons.Rounded.Lock,
+                    "Clave para backup automático",
+                    if (recovery.hasConfiguredKey()) "Configurada en este dispositivo" else "Se configura al conectar Drive"
+                )
+            }
         }
 
         SectionHeader("Copia local")
