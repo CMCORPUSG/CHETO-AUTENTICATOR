@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -117,8 +118,8 @@ internal fun SecurityCenterScreen(
 
         Button(onClick = onLockNow, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Rounded.Lock, contentDescription = null)
-            Spacer(Modifier.height(0.dp))
-            Text("  Bloquear CHETO ahora")
+            Spacer(Modifier.width(8.dp))
+            Text("Bloquear CHETO ahora")
         }
         Text(
             "Las huellas permanecen bajo control de Android. CHETO no almacena plantillas biométricas.",
