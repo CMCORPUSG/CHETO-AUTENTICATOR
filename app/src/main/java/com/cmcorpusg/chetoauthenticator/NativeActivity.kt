@@ -455,8 +455,9 @@ class NativeActivity : FragmentActivity() {
         clipboard.setPrimaryClip(clip)
         lastCopiedCode=value
         message("Código copiado")
+        val clearAfterMillis=((vault?.clipboardClearSeconds ?: 30).coerceIn(15,120))*1000L
         lifecycleScope.launch {
-            delay(30_000)
+            delay(clearAfterMillis)
             if(clipboard.primaryClip?.getItemAt(0)?.text?.toString()==value){
                 clipboard.setPrimaryClip(ClipData.newPlainText("",""))
             }
