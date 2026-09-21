@@ -10,7 +10,9 @@ class SelectiveExportPolicyTest {
         val source = MobileVault(
             pin = "123456",
             name = "Persona",
+            username = "persona.user",
             emails = listOf("persona@example.com"),
+            verifiedEmails = listOf("persona@example.com"),
             photo = "avatar",
             categories = listOf("Sin categoría", "Trabajo", "Social"),
             accounts = listOf(
@@ -30,7 +32,9 @@ class SelectiveExportPolicyTest {
 
         assertEquals(listOf("a"), exported.accounts.map { it.id })
         assertEquals("", exported.name)
+        assertEquals("", exported.username)
         assertTrue(exported.emails.isEmpty())
+        assertTrue(exported.verifiedEmails.isEmpty())
         assertEquals("", exported.photo)
         assertTrue(exported.linkedIdentities.isEmpty())
         assertTrue(exported.trash.isEmpty())
