@@ -15,11 +15,14 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -28,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,9 +65,14 @@ internal fun BackupPage(
     var automatic by remember { mutableStateOf(settings.driveEnabled || settings.oneDriveEnabled) }
     var driveConnected by remember { mutableStateOf(settings.driveEnabled) }
     var oneDriveConnected by remember { mutableStateOf(settings.oneDriveEnabled) }
+    var driveEmail by remember { mutableStateOf(settings.googleDriveAccountEmail.orEmpty()) }
+    var oneDriveEmail by remember { mutableStateOf(settings.oneDriveAccountEmail.orEmpty()) }
+    var accessDialog by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(busy) {
         driveConnected = settings.driveEnabled
         oneDriveConnected = settings.oneDriveEnabled
+        driveEmail = settings.googleDriveAccountEmail.orEmpty()
+        oneDriveEmail = settings.oneDriveAccountEmail.orEmpty()
         automatic = driveConnected || oneDriveConnected
     }
     val lastBackup = if (settings.lastBackupEpochMillis > 0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Sin copias todavía"
@@ -80,6 +89,39 @@ internal fun BackupPage(
         backupAgeHours < 36 -> "Reciente"
         backupAgeHours < 72 -> "Revisar"
         else -> "Desactualizada"
+    }
+
+    accessDialog?.let { provider ->
+        val isGoogle = provider == "google"
+        val connected = if (isGoogle) driveConnected else oneDriveConnected
+        val account = if (isGoogle) driveEmail else oneDriveEmail
+        val providerName = if (isGoogle) "Google Drive" else "Microsoft OneDrive"
+        val permission = if (isGoogle) {
+            "drive.appdata · acceso solo a los datos privados de CHETO"
+        } else {
+            "Files.ReadWrite.AppFolder + User.Read · carpeta privada de CHETO y perfil básico"
+        }
+        val route = if (isGoogle) {
+            "Google Drive › Datos de aplicación (appDataFolder, oculto) › cheto_native_backup_current.cheto"
+        } else {
+            "OneDrive › Apps › CHETO Authenticator › cheto_native_backup_current.cheto"
+        }
+        AlertDialog(
+            onDismissRequest = { accessDialog = null },
+            title = { Text("Accesos de $providerName") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (connected) "✅ Habilitado" else "❌ Deshabilitado")
+                    Text("Cuenta: " + if (connected) account.ifBlank { "Pendiente de identificar; sincroniza una vez" } else "Sin cuenta conectada")
+                    Text("Permisos: $permission")
+                    Text("Ruta: $route")
+                    Text("Automático: cada ~24 h compara la bóveda. Si no cambió, no realiza subida. Si cambió, cifra y reemplaza la misma copia.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { accessDialog = null }) { Text("Cerrar") }
+            }
+        )
     }
 
     Column(
@@ -172,6 +214,9 @@ internal fun BackupPage(
             primaryLabel = if (driveConnected) "Sincronizar ahora" else "Conectar Drive",
             secondaryLabel = "Restaurar desde Drive",
             enabled = !busy,
+            statusConnected = driveConnected,
+            accountLabel = driveEmail,
+            onAccessDetails = { accessDialog = "google" },
             onPrimary = { action("drive") },
             onSecondary = { action("driveRestore") }
         )
@@ -282,6 +327,9 @@ internal fun BackupPage(
             primaryLabel = if (oneDriveConnected) "Guardar ahora" else "Conectar OneDrive",
             secondaryLabel = "Restaurar última",
             enabled = !busy && microsoftConfigured,
+            statusConnected = oneDriveConnected,
+            accountLabel = oneDriveEmail,
+            onAccessDetails = { accessDialog = "onedrive" },
             onPrimary = { action("onedrive") },
             onSecondary = { action("onedriveRestore") }
         )
@@ -324,6 +372,9 @@ private fun BackupOptionCard(
     primaryLabel: String,
     secondaryLabel: String,
     enabled: Boolean,
+    statusConnected: Boolean? = null,
+    accountLabel: String = "",
+    onAccessDetails: (() -> Unit)? = null,
     onPrimary: () -> Unit,
     onSecondary: () -> Unit
 ) {
@@ -331,9 +382,40 @@ private fun BackupOptionCard(
         Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 IconTile(icon, null)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(title, style = MaterialTheme.typography.titleMedium)
+                    statusConnected?.let { connected ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (connected) Icons.Rounded.CheckCircle else Icons.Rounded.Cancel,
+                                contentDescription = null,
+                                tint = if (connected) ChetoSuccess else MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                if (connected) {
+                                    "Habilitado · " + accountLabel.ifBlank { "cuenta pendiente de identificar" }
+                                } else {
+                                    "Deshabilitado · sin cuenta conectada"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (connected) ChetoSuccess else MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                     Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            onAccessDetails?.let { showAccess ->
+                OutlinedButton(
+                    onClick = showAccess,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = ControlShape
+                ) {
+                    Icon(Icons.Rounded.VerifiedUser, contentDescription = null)
+                    Text("  Ver accesos")
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
