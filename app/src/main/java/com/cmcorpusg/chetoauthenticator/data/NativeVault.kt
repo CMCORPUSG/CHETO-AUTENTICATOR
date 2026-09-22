@@ -430,14 +430,15 @@ class NativeVault(context: Context) {
                 key(password, salt),
                 GCMParameterSpec(128, iv)
             )
-            val payload = exportPortableJson(s)
+            val payload = BackupCrypto.compressUtf8(exportPortableJson(s))
             return JSONObject()
-                .put("v", 1)
+                .put("v", 2)
                 .put("alg", "AES-256-GCM")
+                .put("compression", "gzip")
                 .put("iterations", 150000)
                 .put("salt", b64(salt))
                 .put("iv", b64(iv))
-                .put("data", b64(cipher.doFinal(payload.toByteArray())))
+                .put("data", b64(cipher.doFinal(payload)))
                 .toString()
         }
 
@@ -456,8 +457,9 @@ class NativeVault(context: Context) {
             val plain = if (obj.optString("format") == "CHETO-BACKUP") {
                 BackupCrypto.decryptWithPassword(data, password.toCharArray())
             } else {
+                val version = obj.getInt("v")
                 require(
-                    obj.getInt("v") == 1 &&
+                    version in 1..2 &&
                         obj.getInt("iterations") == 150000 &&
                         obj.getString("alg") == "AES-256-GCM"
                 )
@@ -467,7 +469,12 @@ class NativeVault(context: Context) {
                     key(password, bytes(obj.getString("salt"))),
                     GCMParameterSpec(128, bytes(obj.getString("iv")))
                 )
-                cipher.doFinal(bytes(obj.getString("data"))).decodeToString()
+                val decrypted = cipher.doFinal(bytes(obj.getString("data")))
+                if (version >= 2 && obj.optString("compression") == "gzip") {
+                    BackupCrypto.decompressUtf8(decrypted)
+                } else {
+                    decrypted.decodeToString()
+                }
             }
             val restored = decode(JSONObject(plain))
             return current.copy(
