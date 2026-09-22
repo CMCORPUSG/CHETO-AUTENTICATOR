@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.VerifiedUser
@@ -97,12 +98,12 @@ internal fun BackupPage(
         val account = if (isGoogle) driveEmail else oneDriveEmail
         val providerName = if (isGoogle) "Google Drive" else "Microsoft OneDrive"
         val permission = if (isGoogle) {
-            "drive.appdata · acceso solo a los datos privados de CHETO"
+            "drive.file · carpeta visible creada por CHETO + drive.appdata solo para migrar/eliminar la copia oculta anterior"
         } else {
             "Files.ReadWrite.AppFolder + User.Read · carpeta privada de CHETO y perfil básico"
         }
         val route = if (isGoogle) {
-            "Google Drive › Datos de aplicación (appDataFolder, oculto) › cheto_native_backup_current.cheto"
+            "Google Drive › Mi unidad › CHETO Authenticator › Backups › cheto_native_backup_current.cheto"
         } else {
             "OneDrive › Apps › CHETO Authenticator › cheto_native_backup_current.cheto"
         }
@@ -210,13 +211,14 @@ internal fun BackupPage(
         BackupOptionCard(
             icon = Icons.Rounded.Cloud,
             title = "Google Drive",
-            subtitle = "Ruta: Google Drive › Datos de aplicación (appDataFolder, oculto) › cheto_native_backup_current.cheto\nCada ~24 h CHETO compara la bóveda: si cambió, reemplaza esa misma copia; si no cambió, no sube nada.",
+            subtitle = "Ruta: Google Drive › Mi unidad › CHETO Authenticator › Backups › cheto_native_backup_current.cheto\nCada ~24 h CHETO compara la bóveda: si cambió, reemplaza esa misma copia; si no cambió, no sube nada.",
             primaryLabel = if (driveConnected) "Sincronizar ahora" else "Conectar Drive",
             secondaryLabel = "Restaurar desde Drive",
             enabled = !busy,
             statusConnected = driveConnected,
             accountLabel = driveEmail,
             onAccessDetails = { accessDialog = "google" },
+            onOpenLocation = { action("driveOpen") },
             onPrimary = { action("drive") },
             onSecondary = { action("driveRestore") }
         )
@@ -232,7 +234,7 @@ internal fun BackupPage(
         }
 
         if (driveBackups.isNotEmpty()) {
-            SectionHeader("Copia actual de Drive", "Ruta: appDataFolder/cheto_native_backup_current.cheto · CHETO mantiene una sola copia")
+            SectionHeader("Copia actual de Drive", "Ruta: Mi unidad/CHETO Authenticator/Backups/cheto_native_backup_current.cheto · una sola copia")
             driveBackups.forEachIndexed { index, backup ->
                 PremiumCard(Modifier.fillMaxWidth()) {
                     Column(
@@ -330,6 +332,7 @@ internal fun BackupPage(
             statusConnected = oneDriveConnected,
             accountLabel = oneDriveEmail,
             onAccessDetails = { accessDialog = "onedrive" },
+            onOpenLocation = { action("onedriveOpen") },
             onPrimary = { action("onedrive") },
             onSecondary = { action("onedriveRestore") }
         )
@@ -375,6 +378,7 @@ private fun BackupOptionCard(
     statusConnected: Boolean? = null,
     accountLabel: String = "",
     onAccessDetails: (() -> Unit)? = null,
+    onOpenLocation: (() -> Unit)? = null,
     onPrimary: () -> Unit,
     onSecondary: () -> Unit
 ) {
@@ -416,6 +420,17 @@ private fun BackupOptionCard(
                 ) {
                     Icon(Icons.Rounded.VerifiedUser, contentDescription = null)
                     Text("  Ver accesos")
+                }
+            }
+            onOpenLocation?.let { openLocation ->
+                OutlinedButton(
+                    onClick = openLocation,
+                    enabled = statusConnected == true,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = ControlShape
+                ) {
+                    Icon(Icons.Rounded.OpenInNew, contentDescription = null)
+                    Text("  Abrir ubicación")
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
