@@ -56,6 +56,19 @@ class OneDriveBackupClient(
     fun listRecentBackups(accessToken: String, limit: Int = MAX_BACKUPS): List<OneDriveBackupInfo> =
         listBackups(accessToken, limit.coerceIn(1, MAX_BACKUPS))
 
+    fun appFolderWebUrl(accessToken: String): String {
+        val connection = open(
+            "https://graph.microsoft.com/v1.0/me/drive/special/approot?%24select=webUrl",
+            accessToken,
+            "GET"
+        )
+        ensureSuccess(connection)
+        return JSONObject(readBody(connection))
+            .optString("webUrl")
+            .takeIf { it.isNotBlank() }
+            ?: error("OneDrive no devolvió la ubicación web de la carpeta de CHETO")
+    }
+
     fun delete(accessToken: String, fileId: String) {
         require(fileId.isNotBlank()) { "Identificador de OneDrive inválido" }
         val connection = open(
