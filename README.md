@@ -1,83 +1,140 @@
-# CHETO-AUTENTICATOR
+# CHETO Authenticator
 
-## App actual: Android nativo 0.4.0
+CHETO Authenticator es una aplicación Android nativa para administrar códigos TOTP/2FA de forma local, con bóveda cifrada, PIN, biometría, importación por QR y respaldos cifrados locales y opcionales en Google Drive y Microsoft OneDrive.
 
-Interfaz en Kotlin y Jetpack Compose, sin HTML ni WebView. Incluye registro y
-perfil local, PIN, biometría, cuentas TOTP, categorías, QR con cámara o imagen,
-fotos locales, modo oscuro y respaldos cifrados `.cheto`.
+Versión estable: 1.0.0  
+Package Android: com.cmcorpusg.chetoauthenticator  
+Android mínimo: Android 8.0 / API 26  
+Target: API 36  
+Tecnología: Kotlin + Jetpack Compose
 
-Abrir esta carpeta (la que contiene `settings.gradle.kts`) en Android Studio.
-También se puede compilar sin abrir Android Studio:
+Este repositorio contiene código fuente. No debe contener contraseñas, secretos TOTP, QR reales, tokens OAuth, backups personales ni claves privadas de firma.
 
-```powershell
-.\gradlew.bat :app:assembleDebug
-```
+## Funciones principales
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`.
-Inicio: `NativeActivity.kt`. Pantallas: `ui/NativeApp.kt`.
-Almacenamiento y respaldos: `data/NativeVault.kt`.
+- TOTP offline compatible con RFC 6238.
+- Códigos de 6 u 8 dígitos con SHA-1, SHA-256 y SHA-512.
+- Alta manual, QR otpauth y migración de Google Authenticator.
+- Categorías, favoritos, búsqueda, edición, selección múltiple y papelera.
+- Perfil local con nombre, username, correos e imagen.
+- PIN de seis dígitos, biometría, bloqueo automático y protección de pantalla.
+- Bóveda local cifrada con Android Keystore.
+- Exportación, verificación y restauración cifrada .cheto.
+- Compresión GZIP sin pérdida antes del cifrado del backup.
+- Google Drive y Microsoft OneDrive opcionales.
+- Backup periódico aproximado cada 24 horas cuando el proveedor está habilitado y hay red.
+- SHA-256 local antes de contactar al proveedor cloud.
+- Si no cambió la bóveda, el ciclo automático no autentica ni sube nada.
+- Una única copia cloud actual por proveedor.
+- Estado, correo conectado, permisos, ruta y botón para abrir la ubicación cloud.
 
-Drive usa autorización real de Google y requiere configurar OAuth Android y
-el SHA-1 de la firma; ver `docs/GOOGLE_DRIVE_SETUP.md`. Esta versión ofrece
-copias manuales. No simula conexión, sincronización automática ni verificación
-de correos. Los correos del perfil son etiquetas locales.
+## Si alguien solo quiere usar la app
 
-La sección V1 siguiente documenta la implementación anterior, conservada como
-referencia; su interfaz no es el punto de entrada del APK actual.
+La forma recomendada es instalar un APK release oficial publicado en GitHub Releases.
 
-Autenticador TOTP/2FA para Android, orientado a uso personal y con código fuente auditable.
+1. Descargar el APK de la versión estable.
+2. Instalarlo en Android.
+3. Crear un perfil local y PIN, o restaurar un archivo .cheto.
+4. Guardar la contraseña del backup en un lugar seguro. CHETO no puede recuperarla.
 
-## V1
+Si una actualización usa el mismo certificado de firma y un versionCode mayor, Android permite instalarla encima. Si cambia la firma, primero se debe exportar y verificar un .cheto, guardar una copia fuera del teléfono y recién después reinstalar.
 
-- QR estándar `otpauth://totp`.
-- Registro manual mediante clave TOTP.
-- Compatible con servicios que usan TOTP estándar, como Google, Microsoft, Twitch, Kick y otros.
-- Códigos de 6 u 8 dígitos.
-- SHA-1, SHA-256 y SHA-512.
-- Generación offline según RFC 6238.
-- Cuentas cifradas localmente con AES-GCM y Android Keystore.
-- Bloqueo biométrico cuando el dispositivo dispone de biometría fuerte.
-- Copia cifrada en Google Drive `appDataFolder`.
-- Backup periódico cada 24 horas mediante WorkManager.
-- Backup inmediato después de cambios y botón manual.
-- Retención de los 7 backups más recientes.
-- Restauración en otro Android mediante Google Drive + contraseña de recuperación.
+Guía completa: docs/INSTALLATION.md
 
-## Privacidad
+## Si alguien quiere compilar el proyecto
 
-GitHub contiene **solo el código fuente**.
+Requisitos:
 
-No deben subirse:
+- JDK 17.
+- Android SDK API 36.
+- Git.
+- Android Studio compatible o terminal.
+- Gradle Wrapper incluido.
 
-- secretos TOTP;
-- QR reales;
-- códigos 2FA;
-- contraseñas de recuperación;
-- backups `.enc`;
+Clonar:
+
+    git clone https://github.com/CMCORPUSG/CHETO-AUTENTICATOR.git
+    cd CHETO-AUTENTICATOR
+
+En Windows, crear local.properties con la ruta local del SDK. Ejemplo:
+
+    sdk.dir=C:\Users\TU_USUARIO\AppData\Local\Android\Sdk
+
+Compilar debug:
+
+    .\gradlew.bat clean testDebugUnitTest lintDebug assembleDebug
+
+APK debug:
+
+    app/build/outputs/apk/debug/app-debug.apk
+
+Para release se necesita un keystore propio y keystore.properties local. Ver docs/RELEASE.md.
+
+## Cloud en forks y builds propios
+
+TOTP y backup local funcionan sin Google ni Microsoft.
+
+Un APK compilado por otra persona tendrá una firma distinta. Para usar Drive o OneDrive debe registrar su propia firma Android en los proveedores OAuth.
+
+Documentación:
+
+- docs/GOOGLE_DRIVE_SETUP.md
+- docs/IDENTITY_SETUP.md
+- docs/RELEASE.md
+
+Una app Android es un cliente público: no se debe incrustar un client_secret.
+
+## Rutas de backup
+
+Google Drive:
+
+    Mi unidad
+    └── CHETO Authenticator
+        └── Backups
+            └── cheto_native_backup_current.cheto
+
+OneDrive:
+
+    Apps
+    └── CHETO Authenticator
+        └── cheto_native_backup_current.cheto
+
+## Cómo funciona el backup automático
+
+Cuando un proveedor está habilitado, WorkManager agenda una ejecución aproximadamente cada 24 horas y requiere conexión de red.
+
+Antes de tocar cloud, CHETO:
+
+1. genera la representación portable local;
+2. calcula SHA-256;
+3. compara con el último backup exitoso;
+4. si es igual, termina sin autenticar ni usar API;
+5. si cambió, comprime con GZIP;
+6. cifra con AES-256-GCM;
+7. reemplaza cheto_native_backup_current.cheto.
+
+## Seguridad
+
+Nunca subir al repositorio:
+
+- archivos .cheto;
+- .jks o .keystore;
+- keystore.properties;
+- google-services.json;
+- client_secret;
 - tokens OAuth;
-- archivos `google-services.json`;
-- keystores o credenciales de firma.
+- contraseñas;
+- QR o TOTP reales.
 
-La lista completa está protegida por `.gitignore` y documentada en [SECURITY.md](SECURITY.md).
+Ver SECURITY.md y docs/PRIVACY.md.
 
-## Google Drive
+## Estructura técnica
 
-La app solicita únicamente el scope `drive.appdata`, no acceso general al Drive. La configuración de OAuth Android y SHA-1 está explicada en [docs/GOOGLE_DRIVE_SETUP.md](docs/GOOGLE_DRIVE_SETUP.md).
+- NativeActivity.kt: ciclo de vida, biometría, archivos, QR y OAuth.
+- ui/: pantallas Compose.
+- data/NativeVault.kt: bóveda y .cheto.
+- core/TotpEngine.kt: TOTP.
+- backup/: cifrado, WorkManager, Google Drive y OneDrive.
+- identity/: identidad Google/Microsoft.
 
-## Build
-
-Requisitos del proyecto:
-
-- JDK 17
-- Android SDK
-- compileSdk 36 / targetSdk 36
-- Gradle 9.6
-- Android Gradle Plugin 9.4.0
-
-Desde Android Studio se puede abrir la raíz del repositorio y sincronizar Gradle.
-
-GitHub Actions ejecuta automáticamente pruebas unitarias y genera un APK debug como artefacto del workflow.
-
-## Seguridad del backup
-
-La contraseña de recuperación no se guarda. Se deriva una clave con PBKDF2-HMAC-SHA256; la clave derivada que necesita el backup automático se envuelve con una clave de Android Keystore. Los archivos remotos se cifran con AES-256-GCM antes de salir del dispositivo.
+Notas de versión: docs/releases/V1.0.0.md

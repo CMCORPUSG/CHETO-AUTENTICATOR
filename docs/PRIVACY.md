@@ -1,50 +1,51 @@
-# CHETO Authenticator — Privacy and data handling draft
+# Privacidad y tratamiento de datos — CHETO 1.0.0
 
-This document describes the intended data behavior of CHETO Authenticator and is a release-preparation draft.
+## Datos locales
 
-## Data stored on the device
+CHETO puede almacenar secretos TOTP, etiquetas, parámetros TOTP, categorías, favoritos, notas, papelera, perfil local, preferencias y metadatos mínimos de identidad o backup.
 
-CHETO may store:
+La bóveda sensible se protege con criptografía respaldada por Android Keystore.
 
-- TOTP secrets and account labels.
-- Categories, colors and notes.
-- Accounts placed in the encrypted recycle bin until the user restores or permanently deletes them.
-- Local profile name, photo and email list.
-- Linked Google/Microsoft identity metadata.
-- Security preferences and backup status.
+## PIN y biometría
 
-The local vault is encrypted with Android Keystore-backed cryptography. The PIN is persisted as a password verifier rather than as the original six digits.
+El PIN no se guarda como texto plano. La biometría la procesa Android; CHETO no recibe ni guarda plantillas biométricas.
 
-## Biometric data
+## TOTP
 
-CHETO does not receive or store fingerprint templates or facial biometric templates. Enrollment and biometric matching are performed by Android. CHETO receives only the authentication result exposed by Android's biometric APIs.
+La generación TOTP es local y puede funcionar offline.
 
-## TOTP operation
+## Backup .cheto
 
-TOTP generation is local and does not require internet access. CHETO can warn when automatic device time is disabled because inaccurate system time can make TOTP codes fail.
+El formato actual serializa, comprime GZIP, cifra AES-GCM y guarda un contenedor .cheto. La contraseña de recuperación no se incluye dentro del archivo.
 
-Copied TOTP codes are marked as sensitive and are cleared from the clipboard after the configured timeout or when CHETO locks/leaves the foreground. CHETO must not transmit TOTP secrets or generated one-time codes to logo services, analytics providers or identity providers.
+## Google Drive
 
-## Logos
+Scopes: drive.file y drive.appdata.
 
-When an online service logo is requested, CHETO may request a favicon using a service/domain identifier. TOTP secrets, generated codes, recovery passwords and private profile data must not be included in logo requests.
+Ruta:
 
-## Backups
+    Mi unidad/CHETO Authenticator/Backups/cheto_native_backup_current.cheto
 
-A `.cheto` backup is encrypted before it is written to storage or uploaded to Google Drive. The recovery password is required to decrypt the portable backup.
+## OneDrive
 
-Google Drive backup uses the app-private data area where configured. CHETO should not upload an unencrypted vault.
+Permisos: Files.ReadWrite.AppFolder y User.Read.
 
-## Google and Microsoft identity
+Ruta:
 
-Provider sign-in is optional. CHETO stores only the provider identity metadata needed for the local profile. Provider access/ID tokens are not intentionally persisted inside the CHETO vault.
+    Apps/CHETO Authenticator/cheto_native_backup_current.cheto
 
-For any future server-side authorization based on Google or Microsoft identity, identity tokens must be validated by a trusted backend before they are treated as authoritative.
+## Eficiencia cloud
 
-## Analytics and advertising
+Antes de autorización o token, el backup automático calcula SHA-256 local. Sin cambios no se sube nada ni se consume API en ese ciclo. Con cambios se reemplaza la copia actual.
 
-The current application does not require advertising SDKs or behavioral analytics to provide TOTP functionality.
+## Tokens
 
-## Deletion
+No deben registrarse ni subirse a GitHub.
 
-Deleting application data removes the local CHETO vault from the device. External encrypted backups remain wherever the user stored them until the user deletes those copies.
+## Analítica
+
+CHETO no requiere publicidad ni analítica conductual para generar TOTP.
+
+## Eliminación
+
+Desinstalar o borrar datos elimina la bóveda local de esa instalación. Los backups externos permanecen donde el usuario los guardó.

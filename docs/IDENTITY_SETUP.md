@@ -1,63 +1,59 @@
-# CHETO Authenticator — Identity setup
+# Google, Microsoft y OneDrive — configuración
 
-CHETO keeps TOTP generation local. Google and Microsoft sign-in are optional identity features and do not replace the local PIN/biometric protection.
+Las funciones cloud son opcionales. TOTP, bóveda y backup local no dependen de ellas.
 
 ## Google
 
-CHETO uses Android Credential Manager + Sign in with Google.
+Registrar com.cmcorpusg.chetoauthenticator y el SHA-1 del certificado instalado.
 
-1. In Google Auth Platform, create/configure the project.
-2. Register the Android package:
-   `com.cmcorpusg.chetoauthenticator`
-3. Add the SHA-1 of the signing certificate used by the APK.
-4. Create the Web OAuth client ID required by Sign in with Google.
-5. Put the public Web client ID in your local Gradle properties, not in source code:
+Propiedad local para identidad:
 
-```properties
-CHETO_GOOGLE_WEB_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
-```
+    CHETO_GOOGLE_WEB_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
 
-Recommended location on Windows:
+No incluir Google client secret.
 
-```text
-%USERPROFILE%\.gradle\gradle.properties
-```
+## Microsoft Entra y OneDrive
 
-Do not add a Google client secret to an Android application.
+1. Crear App registration.
+2. Configurar audiencia.
+3. Agregar plataforma Android.
+4. Package: com.cmcorpusg.chetoauthenticator.
+5. Registrar hash de firma.
+6. Agregar permisos delegados:
+   - Files.ReadWrite.AppFolder
+   - User.Read
 
-CHETO does not persist the Google ID token. It stores only provider metadata such as account ID, email, display name and photo URI. If CHETO later uses provider identity for server-side authorization, the ID token must be validated by a trusted backend.
+No incrustar client secret.
 
-## Microsoft
+## Calcular hash MSAL
 
-CHETO uses Microsoft Authentication Library (MSAL) in single-account mode.
+    $tmpCert = Join-Path $env:TEMP "cheto-release.cer"
+    & "$env:JAVA_HOME\bin\keytool.exe" -exportcert -alias "cheto-release" -keystore ".\signing\cheto-release.jks" -file $tmpCert
+    $certBytes = [System.IO.File]::ReadAllBytes($tmpCert)
+    $sha1Bytes = [System.Security.Cryptography.SHA1]::Create().ComputeHash($certBytes)
+    $msalHash = [Convert]::ToBase64String($sha1Bytes)
+    $msalEncoded = [Uri]::EscapeDataString($msalHash)
+    "MSAL_HASH=$msalHash"
+    "MSAL_REDIRECT=msauth://com.cmcorpusg.chetoauthenticator/$msalEncoded"
+    Remove-Item $tmpCert -Force
 
-1. Create an app registration in Microsoft Entra.
-2. Select the account audience required by CHETO. The current template supports work/school and personal Microsoft accounts.
-3. Add the Android platform using package:
-   `com.cmcorpusg.chetoauthenticator`
-4. Generate/register the signature hash for the certificate used by the APK.
-5. Copy the public Application (client) ID to local Gradle properties:
+## Recursos MSAL
 
-```properties
-CHETO_MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000
-```
+    app/src/main/res/raw/auth_config_single_account.json
+    app/src/release/res/raw/auth_config_single_account.json
 
-6. Replace the placeholder values in:
+Un fork debe sustituir la configuración por su propia App Registration y firma.
 
-```text
-app/src/main/res/raw/auth_config_single_account.json
-```
+## OneDrive
 
-with the MSAL Android configuration returned by Microsoft Entra, especially `client_id` and `redirect_uri`.
+Ruta:
 
-Never place a Microsoft client secret in the Android app.
+    OneDrive/Apps/CHETO Authenticator/cheto_native_backup_current.cheto
 
-## Debug certificate
+El worker compara SHA-256 local antes de pedir token. Sin cambios no llama a Microsoft.
 
-To inspect the debug certificate locally:
+## Público vs secreto
 
-```powershell
-keytool -list -v -alias androiddebugkey -keystore "$env:USERPROFILE\.android\debug.keystore" -storepass android -keypass android
-```
+Públicos: client ID, package, fingerprints y redirect URI.
 
-Google and Microsoft must be configured for the certificate that signs the APK being tested. A future release certificate has a different fingerprint/signature and must be registered separately.
+Secretos: keystore, password, client secret, tokens, contraseña de backup y secretos TOTP.

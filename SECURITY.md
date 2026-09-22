@@ -1,16 +1,42 @@
-# Security policy
+# Security Policy
 
-CHETO-AUTENTICATOR is designed so that GitHub contains source code only.
+CHETO Authenticator trata TOTP, backups y claves de firma como material sensible.
 
-Never commit:
+## Nunca subir
 
-- TOTP secrets or QR payloads.
-- exported authenticator backups.
-- recovery passwords.
-- OAuth client secrets.
-- signing keystores or passwords.
-- real access tokens.
+- secretos TOTP u otpauth reales;
+- QR o códigos 2FA reales;
+- archivos .cheto;
+- contraseñas de recuperación;
+- access o refresh tokens;
+- client secrets;
+- keystores;
+- passwords de keystore;
+- keystore.properties real;
+- archivos de entorno con secretos.
 
-Backups are encrypted before upload. Local account data is encrypted with a key generated in Android Keystore.
+## Cifrado
 
-For a security issue, avoid opening a public issue containing secrets, QR codes, tokens or screenshots of live codes.
+La bóveda local usa criptografía respaldada por Android Keystore. Los backups se comprimen y cifran antes de salir del dispositivo.
+
+## OAuth
+
+Client IDs, redirects y fingerprints son identificadores públicos. No son client secrets, tokens ni claves privadas.
+
+Un fork debe registrar su propia configuración OAuth y firma cuando corresponda.
+
+## Firma Android
+
+El keystore release debe mantenerse fuera de Git y respaldado de forma segura.
+
+## Reportes
+
+No abrir issues públicos con secretos, QR, tokens, passwords o backups reales.
+
+## Verificación
+
+    git status --short
+    git check-ignore -v ".\keystore.properties"
+    git check-ignore -v ".\signing\cheto-release.jks"
+
+El CI incluye un guard básico de secretos.

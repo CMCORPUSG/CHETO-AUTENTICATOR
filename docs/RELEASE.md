@@ -1,79 +1,84 @@
-# CHETO Authenticator — Release preparation
+# Guía de release — CHETO Authenticator
 
-## 1. Generate a release keystore
+## 1. Firma
 
-Keep the keystore outside Git or in a protected local folder.
+El keystore release permite futuras actualizaciones. Nunca subirlo a Git.
 
-Example:
+## 2. Crear keystore
 
-```powershell
-keytool -genkeypair -v -keystore D:\keys\cheto-release.jks -alias cheto -keyalg RSA -keysize 4096 -validity 10000
-```
+    New-Item -ItemType Directory ".\signing" -Force
+    & "$env:JAVA_HOME\bin\keytool.exe" -genkeypair -v -keystore ".\signing\cheto-release.jks" -storetype JKS -alias "cheto-release" -keyalg RSA -keysize 4096 -validity 10000
 
-Do not commit the keystore or its passwords.
+Usar una contraseña fuerte y no publicarla.
 
-## 2. Create local keystore.properties
+## 3. keystore.properties
 
-Copy `keystore.properties.example` to `keystore.properties` in the repository root and fill it locally:
+    Copy-Item ".\keystore.properties.example" ".\keystore.properties"
 
-```properties
-storeFile=D:/keys/cheto-release.jks
-storePassword=...
-keyAlias=cheto
-keyPassword=...
-```
+Contenido local:
 
-The real `keystore.properties` and `*.jks` files are ignored by Git.
+    storeFile=signing/cheto-release.jks
+    storePassword=CONTRASEÑA_LOCAL
+    keyAlias=cheto-release
+    keyPassword=CONTRASEÑA_LOCAL
 
-## 3. Register the release certificate with identity providers
+## 4. Verificar certificado
 
-The release APK/AAB is signed by a different certificate from the Android debug certificate.
+    & "$env:JAVA_HOME\bin\keytool.exe" -list -v -keystore ".\signing\cheto-release.jks" -alias "cheto-release"
 
-Before Google or Microsoft identity is expected to work in a release build:
+## 5. OAuth release
 
-- Register the release SHA-1/SHA-256 in Google Auth Platform.
-- Register the Android signature hash/redirect URI in Microsoft Entra.
-- Keep Android client secrets out of the app. Mobile apps are public clients.
+Google: package + SHA-1 release y scopes drive.file + drive.appdata.
 
-## 4. Build candidate
+Microsoft: plataforma Android con package + hash de firma y permisos Files.ReadWrite.AppFolder + User.Read.
 
-```powershell
-.\gradlew.bat clean testDebugUnitTest lintDebug assembleDebugAndroidTest assembleRelease
-```
+## 6. Versionado V1.0.0
 
-If `keystore.properties` is present and valid, the release artifact is signed with the configured release key.
+    versionCode = 18
+    versionName = "1.0.0"
 
-## 5. Validate on a physical device
+## 7. Build completo
 
-Before distribution verify:
+    .\gradlew.bat clean testDebugUnitTest lintDebug assembleDebugAndroidTest assembleRelease bundleRelease
 
-- PIN unlock and lockout.
-- Biometric enrollment and unlock.
-- Automatic lock.
-- QR camera and gallery.
-- Google Authenticator migration QR.
-- Duplicate detection.
-- Manual TOTP.
-- Clipboard clearing.
-- FLAG_SECURE / screenshots.
-- Local `.cheto` export, replace restore and non-destructive merge restore.
-- Selective encrypted export of chosen accounts.
-- Recycle bin restore and permanent deletion.
-- Forgot-PIN recovery from a valid encrypted `.cheto` backup.
-- Clipboard timeout and protected code reveal.
-- Automatic device time warning.
-- Google Drive backup, replace restore and merge restore.
-- Verify a local backup without restoring it.
-- Verify the latest Google Drive backup without restoring it.
-- Load Drive backup history and restore a specific encrypted version.
-- Recycle bin retention and restore-all behavior.
-- Multi-QR Google Authenticator migration progress.
-- Google identity linking.
-- Microsoft identity linking.
-- Restore on a second/clean device.
+Artefactos:
 
-## 6. Distribution
+    app/build/outputs/apk/release/app-release.apk
+    app/build/outputs/bundle/release/app-release.aab
 
-For direct internal testing use the release APK. For Google Play use an Android App Bundle (AAB) and Play App Signing.
+## 8. Verificar firma
 
-Never reuse the debug keystore as the production release identity.
+    $apksigner = Get-ChildItem "$env:ANDROID_HOME\build-tools" -Directory | Sort-Object Name -Descending | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName "apksigner.bat" }
+    & $apksigner verify --print-certs ".\app\build\outputs\apk\release\app-release.apk"
+
+## 9. Hashes
+
+    Get-FileHash ".\app\build\outputs\apk\release\app-release.apk" -Algorithm SHA256
+    Get-FileHash ".\app\build\outputs\bundle\release\app-release.aab" -Algorithm SHA256
+
+## 10. Prueba física
+
+Validar arranque minificado, PIN, biometría, QR, TOTP, perfil, .cheto, restauración limpia, Google Drive, OneDrive y actualización con la misma firma.
+
+## 11. Publicar en GitHub Releases
+
+No commitear APK o AAB en el árbol fuente.
+
+1. Crear tag v1.0.0.
+2. Crear Release desde el tag.
+3. Adjuntar app-release.apk.
+4. Opcionalmente adjuntar app-release.aab.
+5. Publicar SHA-256.
+6. Enlazar docs/releases/V1.0.0.md.
+
+El AAB no se instala directamente en un teléfono.
+
+## 12. Respaldo de firma
+
+Mantener al menos dos copias seguras y offline del keystore.
+
+## 13. Revisión antes de push
+
+    git status --short
+    git check-ignore -v ".\keystore.properties"
+    git check-ignore -v ".\signing\cheto-release.jks"
