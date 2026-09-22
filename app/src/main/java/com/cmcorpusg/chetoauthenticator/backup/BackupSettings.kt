@@ -25,6 +25,10 @@ class BackupSettings(context: Context) {
         get() = prefs.getString(KEY_ONEDRIVE_ACCOUNT_EMAIL, null)
         set(value) = prefs.edit().putString(KEY_ONEDRIVE_ACCOUNT_EMAIL, value).apply()
 
+    var googleDriveAccountEmail: String?
+        get() = prefs.getString(KEY_GOOGLE_DRIVE_ACCOUNT_EMAIL, null)
+        set(value) = prefs.edit().putString(KEY_GOOGLE_DRIVE_ACCOUNT_EMAIL, value).apply()
+
     var lastGoogleContentHash: String?
         get() = prefs.getString(KEY_LAST_GOOGLE_HASH, null)
         set(value) = prefs.edit().putString(KEY_LAST_GOOGLE_HASH, value).apply()
@@ -51,6 +55,7 @@ class BackupSettings(context: Context) {
         private const val KEY_LAST_ONEDRIVE_BACKUP = "last_onedrive_backup"
         private const val KEY_ONEDRIVE_ACCOUNT_ID = "onedrive_account_id"
         private const val KEY_ONEDRIVE_ACCOUNT_EMAIL = "onedrive_account_email"
+        private const val KEY_GOOGLE_DRIVE_ACCOUNT_EMAIL = "google_drive_account_email"
         private const val KEY_LAST_GOOGLE_HASH = "last_google_content_hash"
         private const val KEY_LAST_ONEDRIVE_HASH = "last_onedrive_content_hash"
         private const val KEY_LAST_BACKUP = "last_backup"
