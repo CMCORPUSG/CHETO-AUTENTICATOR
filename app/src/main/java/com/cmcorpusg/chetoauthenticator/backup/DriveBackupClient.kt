@@ -85,6 +85,21 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
     fun listRecentBackups(accessToken: String, limit: Int = MAX_BACKUPS): List<DriveBackupInfo> =
         listBackups(accessToken, limit.coerceIn(1, MAX_BACKUPS))
 
+    fun currentAccountEmail(accessToken: String): String? {
+        val fields = URLEncoder.encode("user(emailAddress)", Charsets.UTF_8.name())
+        val connection = open(
+            "https://www.googleapis.com/drive/v3/about?fields=$fields",
+            accessToken,
+            "GET"
+        )
+        ensureSuccess(connection)
+        return JSONObject(readBody(connection))
+            .optJSONObject("user")
+            ?.optString("emailAddress")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+    }
+
     fun delete(accessToken: String, fileId: String) {
         require(fileId.matches(Regex("[A-Za-z0-9_-]{5,}"))) { "Identificador de Drive inválido" }
         val connection = open(
