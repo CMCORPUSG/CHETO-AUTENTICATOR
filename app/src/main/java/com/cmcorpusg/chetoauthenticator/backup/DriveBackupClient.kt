@@ -152,9 +152,29 @@ class DriveBackupClient(private val prefix: String = "cheto_backup_") {
     private fun ensureSuccess(connection: HttpURLConnection) {
         val code = connection.responseCode
         if (code !in 200..299) {
-            val error = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            val errorBody = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
             connection.disconnect()
-            throw IllegalStateException("Google Drive HTTP $code: $error")
+
+            val safeDetail = runCatching {
+                val root = JSONObject(errorBody)
+                val error = root.optJSONObject("error")
+                val message = error?.optString("message").orEmpty()
+                val reason = error
+                    ?.optJSONArray("errors")
+                    ?.optJSONObject(0)
+                    ?.optString("reason")
+                    .orEmpty()
+
+                listOf(reason, message)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" · ")
+                    .take(240)
+            }.getOrDefault("")
+
+            throw IllegalStateException(
+                "Google Drive HTTP $code" +
+                    safeDetail.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
+            )
         }
     }
 
