@@ -810,7 +810,12 @@ class NativeActivity : FragmentActivity() {
         )
     }
     private fun drive(action:(String)->Unit){
-        val request=AuthorizationRequest.builder().setRequestedScopes(listOf(Scope("https://www.googleapis.com/auth/drive.appdata")))
+        val request=AuthorizationRequest.builder().setRequestedScopes(
+            listOf(
+                Scope("https://www.googleapis.com/auth/drive.file"),
+                Scope("https://www.googleapis.com/auth/drive.appdata")
+            )
+        )
             .setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT)
             .build()
         Identity.getAuthorizationClient(this).authorize(request).addOnSuccessListener { result ->
@@ -868,6 +873,30 @@ class NativeActivity : FragmentActivity() {
 
     private fun backup(mode:String,password:String){
         val current=vault?:return
+
+        if(mode=="driveOpen"){
+            drive { token ->
+                work("Abriendo ubicación de Google Drive") {
+                    val url=DriveBackupClient("cheto_native_backup_").backupFolderWebUrl(token)
+                    withContext(Dispatchers.Main){
+                        startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))
+                    }
+                }
+            }
+            return
+        }
+
+        if(mode=="onedriveOpen"){
+            oneDrive { token ->
+                work("Abriendo ubicación de OneDrive") {
+                    val url=OneDriveBackupClient("cheto_native_backup_").appFolderWebUrl(token)
+                    withContext(Dispatchers.Main){
+                        startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))
+                    }
+                }
+            }
+            return
+        }
 
         if(mode.startsWith("driveRestoreId:")){
             val fileId=mode.substringAfter("driveRestoreId:")
