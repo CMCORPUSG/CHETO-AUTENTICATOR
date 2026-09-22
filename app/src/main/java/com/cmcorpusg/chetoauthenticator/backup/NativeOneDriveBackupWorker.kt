@@ -19,17 +19,33 @@ class NativeOneDriveBackupWorker(
         val settings = BackupSettings(applicationContext)
         if (!settings.oneDriveEnabled) return@withContext Result.success()
 
-        val accountId = settings.oneDriveAccountId
-            ?: return@withContext Result.success()
-
         val vaultStore = NativeVault(applicationContext)
         if (!vaultStore.exists()) return@withContext Result.success()
 
-        val recoveryKeys = RecoveryKeyStore(applicationContext, "onedrive")
-        val key = recoveryKeys.getKey() ?: return@withContext Result.failure()
-        val salt = recoveryKeys.getSalt() ?: return@withContext Result.failure()
-
         try {
+            // Compare locally before touching Microsoft. If the vault did not change,
+            // this periodic run performs zero Microsoft authorization/API calls.
+            val plain = NativeVault.exportPortableJson(vaultStore.read())
+            val fingerprint = BackupContentFingerprint.sha256(plain)
+            if (settings.lastOneDriveContentHash == fingerprint) {
+                settings.lastError = null
+                return@withContext Result.success()
+            }
+
+            val accountId = settings.oneDriveAccountId
+            if (accountId.isNullOrBlank()) {
+                settings.lastError = "Microsoft OneDrive requiere seleccionar una cuenta dentro de CHETO"
+                return@withContext Result.success()
+            }
+
+            val recoveryKeys = RecoveryKeyStore(applicationContext, "onedrive")
+            val key = recoveryKeys.getKey()
+            val salt = recoveryKeys.getSalt()
+            if (key == null || salt == null) {
+                settings.lastError = "OneDrive requiere volver a configurar la contraseña de backup dentro de CHETO"
+                return@withContext Result.success()
+            }
+
             val app = PublicClientApplication.createMultipleAccountPublicClientApplication(
                 applicationContext,
                 R.raw.auth_config_single_account
@@ -47,14 +63,6 @@ class NativeOneDriveBackupWorker(
                 .build()
 
             val result = app.acquireTokenSilent(silent)
-            val plain = NativeVault.exportPortableJson(vaultStore.read())
-            val fingerprint = BackupContentFingerprint.sha256(plain)
-
-            if (settings.lastOneDriveContentHash == fingerprint) {
-                settings.lastError = null
-                return@withContext Result.success()
-            }
-
             val encrypted = BackupCrypto.encrypt(plain, key, salt)
             OneDriveBackupClient("cheto_native_backup_").upload(
                 result.accessToken,
@@ -67,7 +75,10 @@ class NativeOneDriveBackupWorker(
             Result.success()
         } catch (error: Exception) {
             settings.lastError = error.message?.take(200)
-            Result.retry()
+                ?: "No se pudo completar el backup automático de OneDrive"
+            // Avoid WorkManager backoff retries that would create unnecessary
+            // cloud calls. The next periodic cycle or a manual action will retry.
+            Result.success()
         }
     }
 }
