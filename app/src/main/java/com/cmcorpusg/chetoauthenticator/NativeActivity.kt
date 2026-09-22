@@ -858,6 +858,9 @@ class NativeActivity : FragmentActivity() {
         BackupSettings(this).apply {
             driveEnabled=false
             oneDriveEnabled=false
+            googleDriveAccountEmail=null
+            oneDriveAccountId=null
+            oneDriveAccountEmail=null
         }
         BackupScheduler.disable(this)
         message("Backup automático de Google Drive y OneDrive desactivado")
@@ -994,11 +997,14 @@ class NativeActivity : FragmentActivity() {
                         saveFile.launch("CHETO-${System.currentTimeMillis()}.cheto")
                     } else drive { token ->
                         work("Copia cifrada guardada en Google Drive") {
-                            DriveBackupClient("cheto_native_backup_").upload(token,payload)
+                            val client=DriveBackupClient("cheto_native_backup_")
+                            client.upload(token,payload)
+                            val driveEmail=client.currentAccountEmail(token)
                             RecoveryKeyStore(this@NativeActivity).configure(password.toCharArray())
                             val plain=NativeVault.exportPortableJson(current)
                             BackupSettings(this@NativeActivity).apply {
                                 driveEnabled=true
+                                googleDriveAccountEmail=driveEmail
                                 lastGoogleContentHash=BackupContentFingerprint.sha256(plain)
                                 lastBackupEpochMillis=System.currentTimeMillis()
                                 lastError=null
