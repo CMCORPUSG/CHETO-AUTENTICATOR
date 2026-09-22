@@ -28,8 +28,8 @@ android {
         applicationId = "com.cmcorpusg.chetoauthenticator"
         minSdk = 26
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.15.0"
+        versionCode = 16
+        versionName = "1.0.0-rc1"
 
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", googleWebClientId.asBuildConfigString())
         buildConfigField("String", "MICROSOFT_CLIENT_ID", microsoftClientId.asBuildConfigString())
