@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.setContent
@@ -558,8 +559,34 @@ class NativeActivity : FragmentActivity() {
 
     private fun work(success: String,action: suspend ()->Unit){
         busy=true;lifecycleScope.launch {
-            try{withContext(Dispatchers.IO){action()};message(success)}catch(e:Exception){message("No se pudo completar. Verifica el archivo, la contraseña o la conexión.")}
-            finally{busy=false}
+            try{
+                withContext(Dispatchers.IO){action()}
+                message(success)
+            }catch(e:Exception){
+                val diagnostic=safeOperationError(e)
+                Log.e("CHETO-Cloud","Operación fallida: ${e.javaClass.simpleName} · $diagnostic")
+                message(diagnostic)
+            }finally{
+                busy=false
+            }
+        }
+    }
+
+    private fun safeOperationError(error: Throwable): String {
+        val raw=error.message.orEmpty()
+        return when {
+            raw.startsWith("Google Drive HTTP ") ->
+                "Google Drive rechazó la operación (${raw.substringBefore(':')})."
+            raw.startsWith("Microsoft OneDrive respondió HTTP ") ->
+                "Microsoft OneDrive rechazó la operación (${raw.substringBefore(':')})."
+            error is java.net.UnknownHostException ->
+                "No hay conexión a Internet o no se pudo resolver el servidor."
+            error is java.net.SocketTimeoutException ->
+                "La conexión con el servicio agotó el tiempo de espera. Intenta nuevamente."
+            raw.contains("Sin copias",ignoreCase=true) ->
+                raw
+            else ->
+                "No se pudo completar la operación. Revisa la conexión y vuelve a intentarlo."
         }
     }
     private fun receiveQr(raw:String){
