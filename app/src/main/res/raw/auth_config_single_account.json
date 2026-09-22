@@ -1,7 +1,7 @@
 {
-  "client_id": "00000000-0000-0000-0000-000000000000",
+  "client_id": "78454b61-cee1-423c-a27b-73157f6698de",
   "authorization_user_agent": "WEBVIEW",
-  "redirect_uri": "msauth://com.cmcorpusg.chetoauthenticator/placeholder",
+  "redirect_uri": "msauth://com.cmcorpusg.chetoauthenticator/79jjNkVTMEFWTlGfvqT%2FRkyhVME%3D",
   "broker_redirect_uri_registered": false,
   "account_mode": "MULTIPLE",
   "authorities": [
