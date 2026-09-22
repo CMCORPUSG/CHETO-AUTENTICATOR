@@ -6,7 +6,6 @@ import androidx.work.WorkerParameters
 import com.cmcorpusg.chetoauthenticator.data.NativeVault
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
-import com.google.android.gms.common.Scopes
 import com.google.android.gms.common.api.Scope
 import com.google.android.gms.tasks.Tasks
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +42,12 @@ class NativeDriveBackupWorker(
             }
 
             val request = AuthorizationRequest.builder()
-                .setRequestedScopes(listOf(Scope(Scopes.DRIVE_APPFOLDER)))
+                .setRequestedScopes(
+                    listOf(
+                        Scope("https://www.googleapis.com/auth/drive.file"),
+                        Scope("https://www.googleapis.com/auth/drive.appdata")
+                    )
+                )
                 .build()
 
             val authResult = Tasks.await(
