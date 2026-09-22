@@ -347,12 +347,16 @@ fun NativeApp(
                                 onLoadDriveBackups=onLoadDriveBackups,
                                 microsoftConfigured=microsoftIdentityConfigured,
                                 action={ mode->
-                                    critical=PendingCriticalAction(
-                                        "Acceso al respaldo",
-                                        "Confirma tu identidad antes de exportar, restaurar o sincronizar la bóveda."
-                                    ){
-                                        if(mode.startsWith("driveDeleteId:")) onBackup(mode,"")
-                                        else backupMode=mode
+                                    if(mode=="driveOpen" || mode=="onedriveOpen"){
+                                        onBackup(mode,"")
+                                    } else {
+                                        critical=PendingCriticalAction(
+                                            "Acceso al respaldo",
+                                            "Confirma tu identidad antes de exportar, restaurar o sincronizar la bóveda."
+                                        ){
+                                            if(mode.startsWith("driveDeleteId:")) onBackup(mode,"")
+                                            else backupMode=mode
+                                        }
                                     }
                                 },
                                 onDisableAuto={ after->
