@@ -10,7 +10,7 @@ fun String.asBuildConfigString(): String =
 
 val googleWebClientId = providers.gradleProperty("CHETO_GOOGLE_WEB_CLIENT_ID").orElse("").get()
 val microsoftClientId = providers.gradleProperty("CHETO_MICROSOFT_CLIENT_ID")
-    .orElse("78454b61-cee1-423c-a27b-73157f6698de")
+    .orElse("78454d61-cee1-423c-a27b-73157f6698de")
     .get()
 
 val releaseKeystoreFile = rootProject.file("keystore.properties")
