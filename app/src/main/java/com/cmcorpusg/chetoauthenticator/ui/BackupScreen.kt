@@ -59,10 +59,12 @@ internal fun BackupPage(
     val settings = remember { BackupSettings(context) }
     val recovery = remember { RecoveryKeyStore(context) }
     var automatic by remember { mutableStateOf(settings.driveEnabled || settings.oneDriveEnabled) }
+    var driveConnected by remember { mutableStateOf(settings.driveEnabled) }
     var oneDriveConnected by remember { mutableStateOf(settings.oneDriveEnabled) }
     LaunchedEffect(busy) {
-        automatic = settings.driveEnabled || settings.oneDriveEnabled
+        driveConnected = settings.driveEnabled
         oneDriveConnected = settings.oneDriveEnabled
+        automatic = driveConnected || oneDriveConnected
     }
     val lastBackup = if (settings.lastBackupEpochMillis > 0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Sin copias todavía"
     val lastVerified = if (settings.lastVerifiedBackupEpochMillis > 0) {
@@ -166,14 +168,14 @@ internal fun BackupPage(
         BackupOptionCard(
             icon = Icons.Rounded.Cloud,
             title = "Google Drive",
-            subtitle = "Una sola copia .cheto cifrada; cada ~24 h se reemplaza solo si hubo cambios",
-            primaryLabel = if (automatic) "Sincronizar ahora" else "Conectar Drive",
+            subtitle = "Ruta: Google Drive › Datos de aplicación (appDataFolder, oculto) › cheto_native_backup_current.cheto\nCada ~24 h CHETO compara la bóveda: si cambió, reemplaza esa misma copia; si no cambió, no sube nada.",
+            primaryLabel = if (driveConnected) "Sincronizar ahora" else "Conectar Drive",
             secondaryLabel = "Restaurar desde Drive",
             enabled = !busy,
             onPrimary = { action("drive") },
             onSecondary = { action("driveRestore") }
         )
-        if (automatic) {
+        if (driveConnected) {
             OutlinedButton(
                 onClick = onLoadDriveBackups,
                 enabled = !busy,
@@ -185,7 +187,7 @@ internal fun BackupPage(
         }
 
         if (driveBackups.isNotEmpty()) {
-            SectionHeader("Copia actual de Drive", "CHETO mantiene una sola copia para ahorrar espacio")
+            SectionHeader("Copia actual de Drive", "Ruta: appDataFolder/cheto_native_backup_current.cheto · CHETO mantiene una sola copia")
             driveBackups.forEachIndexed { index, backup ->
                 PremiumCard(Modifier.fillMaxWidth()) {
                     Column(
@@ -194,7 +196,7 @@ internal fun BackupPage(
                     ) {
                         val millis = runCatching { Instant.parse(backup.modifiedTime).toEpochMilli() }.getOrNull()
                         Text(
-                            "CHETO-BACKUP.cheto",
+                            "cheto_native_backup_current.cheto",
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
@@ -249,7 +251,7 @@ internal fun BackupPage(
             }
         }
 
-        if (automatic) {
+        if (driveConnected) {
             OutlinedButton(
                 onClick = { action("driveVerify") },
                 enabled = !busy,
@@ -273,17 +275,14 @@ internal fun BackupPage(
             icon = Icons.Rounded.Cloud,
             title = "Microsoft OneDrive",
             subtitle = if (microsoftConfigured) {
-                "Una sola copia .cheto cifrada; cada ~24 h se reemplaza solo si hubo cambios"
+                "Ruta: OneDrive › Apps › CHETO Authenticator › cheto_native_backup_current.cheto\nCada ~24 h CHETO compara la bóveda: si cambió, reemplaza esa misma copia; si no cambió, no sube nada."
             } else {
-                "Falta configurar la aplicación Microsoft Entra para habilitar OneDrive"
+                "Ruta prevista: OneDrive › Apps › CHETO Authenticator › cheto_native_backup_current.cheto\nFalta configurar la aplicación Microsoft Entra para habilitar OneDrive."
             },
             primaryLabel = if (oneDriveConnected) "Guardar ahora" else "Conectar OneDrive",
             secondaryLabel = "Restaurar última",
             enabled = !busy && microsoftConfigured,
-            onPrimary = {
-                action("onedrive")
-                oneDriveConnected = true
-            },
+            onPrimary = { action("onedrive") },
             onSecondary = { action("onedriveRestore") }
         )
         if (microsoftConfigured) {
