@@ -1,0 +1,448 @@
+package com.cmcorpusg.chetoauthenticator.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.cmcorpusg.chetoauthenticator.backup.BackupSettings
+import com.cmcorpusg.chetoauthenticator.backup.DriveBackupInfo
+import com.cmcorpusg.chetoauthenticator.backup.RecoveryKeyStore
+import java.time.Instant
+import com.cmcorpusg.chetoauthenticator.data.MobileVault
+
+@Composable
+internal fun BackupPage(
+    vault: MobileVault,
+    busy: Boolean,
+    driveBackups: List<DriveBackupInfo>,
+    onLoadDriveBackups: () -> Unit,
+    microsoftConfigured: Boolean,
+    action: (String) -> Unit,
+    onDisableAuto: ((() -> Unit)) -> Unit
+) {
+    val context = LocalContext.current
+    val settings = remember { BackupSettings(context) }
+    val recovery = remember { RecoveryKeyStore(context) }
+    var automatic by remember { mutableStateOf(settings.driveEnabled || settings.oneDriveEnabled) }
+    var driveConnected by remember { mutableStateOf(settings.driveEnabled) }
+    var oneDriveConnected by remember { mutableStateOf(settings.oneDriveEnabled) }
+    var driveEmail by remember { mutableStateOf(settings.googleDriveAccountEmail.orEmpty()) }
+    var oneDriveEmail by remember { mutableStateOf(settings.oneDriveAccountEmail.orEmpty()) }
+    var accessDialog by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(busy) {
+        driveConnected = settings.driveEnabled
+        oneDriveConnected = settings.oneDriveEnabled
+        driveEmail = settings.googleDriveAccountEmail.orEmpty()
+        oneDriveEmail = settings.oneDriveAccountEmail.orEmpty()
+        automatic = driveConnected || oneDriveConnected
+    }
+    val lastBackup = if (settings.lastBackupEpochMillis > 0) LimaClock.nowLabel(settings.lastBackupEpochMillis) else "Sin copias todavía"
+    val lastVerified = if (settings.lastVerifiedBackupEpochMillis > 0) {
+        LimaClock.nowLabel(settings.lastVerifiedBackupEpochMillis)
+    } else {
+        "Nunca verificada"
+    }
+    val backupAgeHours = if (settings.lastBackupEpochMillis > 0) {
+        (System.currentTimeMillis() - settings.lastBackupEpochMillis).coerceAtLeast(0L) / 3_600_000L
+    } else Long.MAX_VALUE
+    val freshness = when {
+        settings.lastBackupEpochMillis <= 0L -> "Sin copia"
+        backupAgeHours < 36 -> "Reciente"
+        backupAgeHours < 72 -> "Revisar"
+        else -> "Desactualizada"
+    }
+
+    accessDialog?.let { provider ->
+        val isGoogle = provider == "google"
+        val connected = if (isGoogle) driveConnected else oneDriveConnected
+        val account = if (isGoogle) driveEmail else oneDriveEmail
+        val providerName = if (isGoogle) "Google Drive" else "Microsoft OneDrive"
+        val permission = if (isGoogle) {
+            "drive.file · carpeta visible creada por CHETO + drive.appdata solo para migrar/eliminar la copia oculta anterior"
+        } else {
+            "Files.ReadWrite.AppFolder + User.Read · carpeta privada de CHETO y perfil básico"
+        }
+        val route = if (isGoogle) {
+            "Google Drive › Mi unidad › CHETO Authenticator › Backups › cheto_native_backup_current.cheto"
+        } else {
+            "OneDrive › Apps › CHETO Authenticator › cheto_native_backup_current.cheto"
+        }
+        AlertDialog(
+            onDismissRequest = { accessDialog = null },
+            title = { Text("Accesos de $providerName") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (connected) "✅ Habilitado" else "❌ Deshabilitado")
+                    Text("Cuenta: " + if (connected) account.ifBlank { "Pendiente de identificar; sincroniza una vez" } else "Sin cuenta conectada")
+                    Text("Permisos: $permission")
+                    Text("Ruta: $route")
+                    Text("Automático: cada ~24 h compara la bóveda. Si no cambió, no realiza subida. Si cambió, cifra y reemplaza la misma copia.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { accessDialog = null }) { Text("Cerrar") }
+            }
+        )
+    }
+
+    Column(
+        Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        SectionHeader("Protege tu bóveda", "Copias cifradas que solo tú puedes abrir")
+        Card(
+            Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = if (automatic) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                IconTile(if (automatic) Icons.Rounded.CloudDone else Icons.Rounded.CloudOff, null)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(if (automatic) "Backup automático activo" else "Backup automático inactivo", style = MaterialTheme.typography.titleMedium)
+                    Text(lastBackup, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Surface(shape = RoundedCornerShape(50), color = if (automatic) ChetoSuccess.copy(alpha = .13f) else MaterialTheme.colorScheme.outlineVariant) {
+                    Text(if (automatic) "Activo" else "Manual", Modifier.padding(horizontal = 9.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = if (automatic) ChetoSuccess else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        settings.lastError?.takeIf { it.isNotBlank() }?.let {
+            Text("Último aviso: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+
+        PremiumCard(Modifier.fillMaxWidth()) {
+            Column {
+                InfoRow(
+                    Icons.Rounded.VerifiedUser,
+                    "Estado de recuperación",
+                    "${vault.accounts.size} cuentas · $freshness"
+                )
+                androidx.compose.material3.HorizontalDivider(
+                    Modifier.padding(start = 67.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                InfoRow(
+                    Icons.Rounded.Lock,
+                    "Clave para backup automático",
+                    if (recovery.hasConfiguredKey()) "Configurada en este dispositivo" else "Se configura al conectar Drive"
+                )
+                androidx.compose.material3.HorizontalDivider(
+                    Modifier.padding(start = 67.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                InfoRow(
+                    Icons.Rounded.Verified,
+                    "Última verificación",
+                    lastVerified
+                )
+            }
+        }
+
+        SectionHeader("Copia local")
+        BackupOptionCard(
+            icon = Icons.Rounded.Backup,
+            title = "Archivo .cheto",
+            subtitle = "Guárdalo en tu PC, USB o almacenamiento seguro",
+            primaryLabel = "Exportar copia",
+            secondaryLabel = "Restaurar archivo",
+            enabled = !busy,
+            onPrimary = { action("export") },
+            onSecondary = { action("restore") }
+        )
+        OutlinedButton(
+            onClick = { action("restoreMerge") },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().height(43.dp),
+            shape = ControlShape
+        ) {
+            Text("Fusionar copia sin reemplazar tu bóveda")
+        }
+        OutlinedButton(
+            onClick = { action("verify") },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().height(43.dp),
+            shape = ControlShape
+        ) {
+            Icon(Icons.Rounded.Verified, contentDescription = null)
+            Text("  Verificar copia sin restaurar")
+        }
+
+        SectionHeader("Nube privada")
+        BackupOptionCard(
+            icon = Icons.Rounded.Cloud,
+            title = "Google Drive",
+            subtitle = "Ruta: Google Drive › Mi unidad › CHETO Authenticator › Backups › cheto_native_backup_current.cheto\nCada ~24 h CHETO compara la bóveda: si cambió, reemplaza esa misma copia; si no cambió, no sube nada.",
+            primaryLabel = if (driveConnected) "Sincronizar ahora" else "Conectar Drive",
+            secondaryLabel = "Restaurar desde Drive",
+            enabled = !busy,
+            statusConnected = driveConnected,
+            accountLabel = driveEmail,
+            onAccessDetails = { accessDialog = "google" },
+            onOpenLocation = { action("driveOpen") },
+            onPrimary = { action("drive") },
+            onSecondary = { action("driveRestore") }
+        )
+        if (driveConnected) {
+            OutlinedButton(
+                onClick = onLoadDriveBackups,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                shape = ControlShape
+            ) {
+                Text(if (driveBackups.isEmpty()) "Ver copia actual de Drive" else "Actualizar copia actual")
+            }
+        }
+
+        if (driveBackups.isNotEmpty()) {
+            SectionHeader("Copia actual de Drive", "Ruta: Mi unidad/CHETO Authenticator/Backups/cheto_native_backup_current.cheto · una sola copia")
+            driveBackups.forEachIndexed { index, backup ->
+                PremiumCard(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        val millis = runCatching { Instant.parse(backup.modifiedTime).toEpochMilli() }.getOrNull()
+                        Text(
+                            "cheto_native_backup_current.cheto",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            millis?.let(LimaClock::nowLabel) ?: backup.modifiedTime.ifBlank { backup.name },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { action("driveVerifyId:${backup.id}") },
+                                enabled = !busy,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = ControlShape
+                            ) {
+                                Text("Verificar")
+                            }
+                            Button(
+                                onClick = { action("driveRestoreId:${backup.id}") },
+                                enabled = !busy,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = ControlShape
+                            ) {
+                                Text("Restaurar")
+                            }
+                        }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { action("driveMergeId:${backup.id}") },
+                                enabled = !busy,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = ControlShape
+                            ) {
+                                Text("Fusionar")
+                            }
+                            OutlinedButton(
+                                onClick = { action("driveDeleteId:${backup.id}") },
+                                enabled = !busy,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                shape = ControlShape
+                            ) {
+                                Text("Eliminar")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (driveConnected) {
+            OutlinedButton(
+                onClick = { action("driveVerify") },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                shape = ControlShape
+            ) {
+                Icon(Icons.Rounded.Verified, contentDescription = null)
+                Text("  Verificar última copia de Drive")
+            }
+            OutlinedButton(
+                onClick = { action("driveRestoreMerge") },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                shape = ControlShape
+            ) {
+                Text("Fusionar última copia de Drive")
+            }
+        }
+        SectionHeader("Microsoft", "Outlook / Hotmail usa OneDrive, no Google Drive")
+        BackupOptionCard(
+            icon = Icons.Rounded.Cloud,
+            title = "Microsoft OneDrive",
+            subtitle = if (microsoftConfigured) {
+                "Ruta: OneDrive › Apps › CHETO Authenticator › cheto_native_backup_current.cheto\nCada ~24 h CHETO compara la bóveda: si cambió, reemplaza esa misma copia; si no cambió, no sube nada."
+            } else {
+                "Ruta prevista: OneDrive › Apps › CHETO Authenticator › cheto_native_backup_current.cheto\nFalta configurar la aplicación Microsoft Entra para habilitar OneDrive."
+            },
+            primaryLabel = if (oneDriveConnected) "Guardar ahora" else "Conectar OneDrive",
+            secondaryLabel = "Restaurar última",
+            enabled = !busy && microsoftConfigured,
+            statusConnected = oneDriveConnected,
+            accountLabel = oneDriveEmail,
+            onAccessDetails = { accessDialog = "onedrive" },
+            onOpenLocation = { action("onedriveOpen") },
+            onPrimary = { action("onedrive") },
+            onSecondary = { action("onedriveRestore") }
+        )
+        if (microsoftConfigured) {
+            OutlinedButton(
+                onClick = { action("onedriveVerify") },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                shape = ControlShape
+            ) {
+                Icon(Icons.Rounded.Verified, contentDescription = null)
+                Text("  Verificar última copia de OneDrive")
+            }
+        }
+
+        if (automatic) {
+            OutlinedButton(
+                onClick = { onDisableAuto { automatic = false } },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                shape = ControlShape
+            ) { Text("Desactivar backup automático") }
+        }
+
+        Card(Modifier.fillMaxWidth(), shape = CardShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+            Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Lock, null, tint = MaterialTheme.colorScheme.secondary)
+                Text("Guarda tu contraseña de recuperación fuera del teléfono. No podemos recuperarla por ti.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun BackupOptionCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    primaryLabel: String,
+    secondaryLabel: String,
+    enabled: Boolean,
+    statusConnected: Boolean? = null,
+    accountLabel: String = "",
+    onAccessDetails: (() -> Unit)? = null,
+    onOpenLocation: (() -> Unit)? = null,
+    onPrimary: () -> Unit,
+    onSecondary: () -> Unit
+) {
+    PremiumCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                IconTile(icon, null)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    statusConnected?.let { connected ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (connected) Icons.Rounded.CheckCircle else Icons.Rounded.Cancel,
+                                contentDescription = null,
+                                tint = if (connected) ChetoSuccess else MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                if (connected) {
+                                    "Habilitado · " + accountLabel.ifBlank { "cuenta pendiente de identificar" }
+                                } else {
+                                    "Deshabilitado · sin cuenta conectada"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (connected) ChetoSuccess else MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            onAccessDetails?.let { showAccess ->
+                OutlinedButton(
+                    onClick = showAccess,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = ControlShape
+                ) {
+                    Icon(Icons.Rounded.VerifiedUser, contentDescription = null)
+                    Text("  Ver accesos")
+                }
+            }
+            onOpenLocation?.let { openLocation ->
+                OutlinedButton(
+                    onClick = openLocation,
+                    enabled = statusConnected == true,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = ControlShape
+                ) {
+                    Icon(Icons.Rounded.OpenInNew, contentDescription = null)
+                    Text("  Abrir ubicación")
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onPrimary, enabled = enabled, modifier = Modifier.weight(1f).height(43.dp), shape = ControlShape) {
+                    Icon(Icons.Rounded.Upload, null)
+                    Text("  $primaryLabel", maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                }
+                OutlinedButton(onClick = onSecondary, enabled = enabled, modifier = Modifier.weight(1f).height(43.dp), shape = ControlShape) {
+                    Icon(Icons.Rounded.Download, null)
+                    Text("  $secondaryLabel", maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
