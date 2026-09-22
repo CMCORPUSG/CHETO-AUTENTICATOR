@@ -1,3 +1,21 @@
+<div align="center">
+
+<img src="docs/assets/logo.png" width="140" alt="CHETO Authenticator">
+
+# CHETO Authenticator
+
+**Secure TOTP / 2FA for Android**
+
+**Offline-first | Encrypted Vault | Google Drive | OneDrive | PIN | Biometrics**
+
+[DESCARGAR APK V1.0.0](https://github.com/CMCORPUSG/CHETO-AUTENTICATOR/releases/download/v1.0.0/CHETO-Authenticator-1.0.0.apk)
+
+[Release](https://github.com/CMCORPUSG/CHETO-AUTENTICATOR/releases/tag/v1.0.0) | [Instalacion](docs/INSTALLATION.md) | [Seguridad](SECURITY.md) | [Privacidad](docs/PRIVACY.md)
+
+</div>
+
+---
+
 # CHETO Authenticator
 
 CHETO Authenticator es una aplicación Android nativa para administrar códigos TOTP/2FA de forma local, con bóveda cifrada, PIN, biometría, importación por QR y respaldos cifrados locales y opcionales en Google Drive y Microsoft OneDrive.
